@@ -1,4 +1,18 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:conda",
-    "python-envs.defaultPackageManager": "ms-python.python:conda"
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "chat.tools.terminal.autoApprove": {
+        "/^cd /Users/phamkhanh/Documents/2025\\.2/Hoc_may_va_khai_pha/Project && python - <<'PY'\nimport json, os, re\nroot='src'\nfor name in sorted\\(os\\.listdir\\(root\\)\\):\n    if not name\\.endswith\\('\\.py'\\):\n        continue\n    py_path = os\\.path\\.join\\(root, name\\)\n    ipynb_path = os\\.path\\.join\\(root, name\\[:-3\\] \\+ '\\.ipynb'\\)\n    with open\\(py_path, 'r', encoding='utf-8'\\) as f:\n        lines = f\\.readlines\\(\\)\n    cells = \\[\\]\n    current = \\[\\]\n    sep_re = re\\.compile\\(r'\\^\\(#\\\\s\\*Step\\|#\\\\s\\*\\\\d\\+\\\\\\.\\|#\\\\s\\*\\[-\\*\\]\\)'\\)\n    for line in lines:\n        if sep_re\\.match\\(line\\) and current:\n            cells\\.append\\(\\{'cell_type': 'code', 'execution_count': None, 'metadata': \\{\\}, 'outputs': \\[\\], 'source': current\\}\\)\n            current = \\[\\]\n        current\\.append\\(line\\)\n    if current:\n        cells\\.append\\(\\{'cell_type': 'code', 'execution_count': None, 'metadata': \\{\\}, 'outputs': \\[\\], 'source': current\\}\\)\n    if not cells:\n        cells = \\[\\{'cell_type': 'code', 'execution_count': None, 'metadata': \\{\\}, 'outputs': \\[\\], 'source': lines\\}\\]\n    nb = \\{'cells': cells, 'metadata': \\{'kernelspec': \\{'name': 'python3', 'display_name': 'Python 3', 'language': 'python'\\}, 'language_info': \\{'name': 'python', 'version': '3'\\}\\}, 'nbformat': 4, 'nbformat_minor': 5\\}\n    with open\\(ipynb_path, 'w', encoding='utf-8'\\) as f:\n        json\\.dump\\(nb, f, indent=2, ensure_ascii=False\\)\n    print\\('updated', ipynb_path\\)\nPY$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd /Users/phamkhanh/Documents/2025\\.2/Hoc_may_va_khai_pha/Project && python - <<'PY'\nimport json\np='src/01_initial_eda\\.ipynb'\nwith open\\(p,'r',encoding='utf-8'\\) as f:\n    nb=json\\.load\\(f\\)\nfor i,c in enumerate\\(nb\\['cells'\\]\\[:3\\],1\\):\n    print\\('CELL',i,c\\['cell_type'\\]\\)\n    print\\('SOURCE:',repr\\(''\\.join\\(c\\['source'\\]\\)\\)\\)\nPY$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd /Users/phamkhanh/Documents/2025\\.2/Hoc_may_va_khai_pha/Project && python - <<'PY'\nimport json, glob\nfor p in sorted\\(glob\\.glob\\('src/0\\*_\\*\\.ipynb'\\)\\):\n    with open\\(p,'r',encoding='utf-8'\\) as f:\n        nb=json\\.load\\(f\\)\n    print\\(p\\)\n    print\\(' 1:', repr\\(''\\.join\\(nb\\['cells'\\]\\[0\\]\\['source'\\]\\)\\)\\[:120\\]\\)\n    print\\(' 2:', nb\\['cells'\\]\\[1\\]\\['cell_type'\\], repr\\(''\\.join\\(nb\\['cells'\\]\\[1\\]\\['source'\\]\\)\\)\\[:80\\]\\)\n    print\\(\\)\nPY$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }
