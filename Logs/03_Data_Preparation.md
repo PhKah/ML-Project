@@ -1,47 +1,49 @@
-# Task 03: Chuẩn bị và Tiền xử lý dữ liệu (Advanced Data Preparation)
+# Task 03: Chuẩn bị và Tiền xử lý dữ liệu hệ thống (Systematic Data Preparation)
 
 ## 1. Mục tiêu & Bối cảnh
-*   **Mục tiêu:** Áp dụng 6 nguyên lý tiền xử lý từ `plan.md` để tạo ra tập dữ liệu chất lượng cao, bảo toàn tính xác thực của mối quan hệ.
+*   **Mục tiêu:** Áp dụng quy trình hướng cấu hình (Config-driven) và ML Pipeline để tiền xử lý dữ liệu, đảm bảo tính tái lập và dễ dàng thay đổi thuộc tính.
 *   **Giai đoạn:** Giai đoạn 3 (Data Preparation) theo `plan.md`.
-*   **Giả thuyết/Câu hỏi:** 
-    *   Việc tách biệt xử lý Entity vs Relationship có giúp giảm nhiễu cho mô hình không?
-    *   Gộp 17 hobbies thành 5 nhóm có làm mất thông tin quan trọng không?
-    *   Thứ tự thực hiện FE (age_gap trước scaling) ảnh hưởng thế nào đến tính đúng đắn của dữ liệu?
+*   **Giả thuyết/Câu hỏi:** Việc tách biệt Logic và Tham số qua biến `CONFIG` có giúp quản lý 6 nguyên lý tiền xử lý hiệu quả hơn không?
 
 ## 2. Đầu vào & Đầu ra (Input/Output)
 *   **Đầu vào:** `Data/Speed Dating Data.csv`.
-*   **Mã nguồn:** `src/03_data_preparation.py`
+*   **Mã nguồn:** `src/03_data_preparation.py` (Phiên bản Refactored)
 *   **Đầu ra:** 
     *   File log này (`Logs/03_Data_Preparation.md`).
-    *   Tập dữ liệu trung gian (`Data/data_cleaned_entities.csv`).
     *   Tập dữ liệu cuối cùng (`Data/data_final_v2.csv`).
 
 ## 3. Chiến lược thực hiện (Strategy)
-Tuân thủ nghiêm ngặt 6 nguyên lý:
-1.  **Entity-Relationship split:** Impute cho User, Delete cho Interaction thiếu > 50%.
-2.  **Order-Dependent FE:** Tính `age_diff` và `hobby_similarity` TRƯỚC khi scale.
-3.  **Scaling Strategy:** MinMax cho thang 1-10, Standard cho tuổi/thu nhập.
-4.  **Meaningful Aggregation:** Gộp 17 hobbies thành 5 nhóm (Fitness, Fine Arts, Entertainment, Social, Wellness).
-5.  **Outlier Handling:** Sử dụng IQR Clip thay vì Drop hàng.
-6.  **Synchronization:** Đảm bảo xóa User thì xóa sạch Interaction liên quan.
+Tuân thủ 6 nguyên lý qua hệ thống mới:
+1.  **Config-Driven:** Toàn bộ danh sách cột được định nghĩa trong `CONFIG`.
+2.  **Pre-match Logic (Anti-leakage):** Loại bỏ hoàn toàn các biến Scorecard (phát sinh SAU cuộc gặp) để đảm bảo mô hình có tính ứng dụng thực tế.
+3.  **Gold Static Features:** Tập trung vào các biến tĩnh (Static) phản ánh bản chất, sở thích và kỳ vọng của người tham gia.
+4.  **Modular Functions:** Tách biệt `entity_cleaning`, `relationship_cleaning`, `feature_engineering`.
+5.  **Referential Integrity:** Đảm bảo tính nhất quán giữa Entity và Relationship (Xóa user -> Xóa tương tác liên quan).
+6.  **Pipeline Scaling:** Sử dụng `ColumnTransformer` cho Scaling đa chiến lược.
 
 ## 4. Hướng dẫn thực hiện chi tiết (Checklist & Tutorial)
 
-- [ ] **Bước 1: Xử lý Thực thể (User Level)**
-    *   Tách riêng dữ liệu Unique Users.
-    *   Impute Missing Values (Median/Mode).
-    *   Clip Outliers (IQR).
-- [ ] **Bước 2: Xử lý Quan hệ (Interaction Level)**
-    *   Tính các biến tương đối (`age_diff`, `hobby_similarity`).
-    *   Xóa bản ghi nếu block đánh giá thiếu quá nhiều.
-    *   Đồng bộ với danh sách User đã làm sạch ở Bước 1.
-- [ ] **Bước 3: Gộp Hobbies & Chuẩn hóa**
-    *   Aggregating 17 hobbies -> 5 features.
-    *   Áp dụng chiến lược Scaling đa dạng (MinMax vs Standard).
+### Phase 1: Tái cấu trúc (Đã hoàn thành)
+- [x] Thiết lập CONFIG và Modular Functions.
+- [x] Xử lý Impute và IQR Clip cho User.
+
+### Phase 2: Tối ưu hóa "Pre-match" & Data-Driven (Sắp thực hiện)
+- [ ] **Bước 1: Thanh lọc Feature (Loại bỏ Leakage)**
+    *   Xóa triệt để các biến Scorecard (like, prob, attr, sinc... và các bản _o).
+- [ ] **Bước 2: Tích hợp toàn diện "Biến Vàng" Time 1 (Tránh chủ quan)**
+    *   Lấy toàn bộ các nhóm: `1_1` (Preferences), `2_1` (Partner expectation), `3_1` (Self-rating), `4_1` (Same-sex peers), `5_1` (Others perceive).
+    *   Bổ sung Demographic & Lifestyle: `goal`, `date`, `go_out`, `exphappy`, `expnum`, `field_cd`, `career_c`.
+- [ ] **Bước 3: Sử dụng Biến Tổng hợp & Referential Integrity**
+    *   Sử dụng `samerace` và `int_corr`.
+    *   Đồng bộ hóa: Xóa `pid` nếu `iid` tương ứng bị loại bỏ ở bước Entity Cleaning.
+- [ ] **Bước 4: Chuẩn hóa đa thang đo**
+    *   Áp dụng MinMaxScaler cho các biến 1-10 và 100pt để đưa về cùng hệ quy chiếu [0, 1].
 
 ## 5. Nhật ký thực thi (Execution Log)
 
-### ✅ Thực thi thành công (Date: 2025-06-03)
+### 🔄 Đang chờ thực hiện (Phase 2: Pre-match Refinement)
+*   *Mục tiêu: Chuyển đổi mô hình sang hướng "Data-Driven", giữ lại tối đa thông tin Pre-event để mô hình tự quyết định độ quan trọng.*
+... (giữ nguyên kết quả thống kê) ...
 
 #### **Bước A: Làm sạch dữ liệu thực thể (Entity-Level Cleaning)**
 - **A1:** Xóa 7 người dùng có >= 5 giá trị thực thể bị thiếu (dropped_iids: [28, 58, 59, 136, 339, 340, 346])
