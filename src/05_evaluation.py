@@ -2,13 +2,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import learning_curve, train_test_split
+import joblib
+import os
 from sklearn.metrics import (
     f1_score, precision_score, recall_score, accuracy_score, roc_auc_score,
     confusion_matrix, classification_report, roc_curve, auc
 )
-from imblearn.over_sampling import SMOTE
-from catboost import CatBoostClassifier
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -21,94 +20,63 @@ plt.rcParams['figure.figsize'] = (14, 10)
 # ============================================================================
 CONFIG = {
     'paths': {
-        'input_data': 'Data/data_final_v2.csv',
-        'results_dir': 'Data/',
+        'test_data': 'Data/test_set_hidden.csv',
+        'winner_model': 'models/winner_model.joblib',
         'plot_dir': 'plots/'
-    },
-    'model': {
-        'name': 'CatBoost',
-        'params': {
-            'n_estimators': 100,
-            'random_state': 42,
-            'verbose': 0,
-            'auto_class_weights': 'Balanced',
-            'learning_rate': 0.1,
-            'depth': 6
-        },
-        'threshold': 0.27 # From Task 04 optimization
     }
 }
 
 print("="*80)
-print("TASK 05: SYSTEMATIC EVALUATION (CATBOOST PRE-MATCH)")
+print("TASK 05: FINAL SYSTEMATIC EVALUATION (DECODING TEST SET)")
 print("="*80)
 
 # ==============================================================================
-# STEP 0: Load and Prepare Data
+# STEP 0: Load Model and Data
 # ==============================================================================
-print("\n[0] Loading data and preparing Honest Split...")
-df = pd.read_csv(CONFIG['paths']['input_data'])
+print("\n[0] Loading Locked Winner Model and Hidden Test Set...")
 
-X = df.drop(['iid', 'pid', 'match'], axis=1)
-y = df['match']
-feature_names = X.columns.tolist()
+if not os.path.exists(CONFIG['paths']['winner_model']):
+    raise FileNotFoundError(f"Winner model not found at {CONFIG['paths']['winner_model']}. Run Task 04 first.")
 
-# 60:20:20 Split (Must match Task 04 logic)
-X_train, X_temp, y_train, y_temp = train_test_split(
-    X, y, test_size=0.4, random_state=42, stratify=y
-)
-X_val, X_test, y_val, y_test = train_test_split(
-    X_temp, y_temp, test_size=0.5, random_state=42, stratify=y_temp
-)
+# Load winner info
+winner = joblib.load(CONFIG['paths']['winner_model'])
+model_name = winner['name']
+pipeline = winner['pipeline']
+threshold = winner['threshold']
 
-# Apply SMOTE to Train ONLY
-sm = SMOTE(random_state=42)
-X_train_res, y_train_res = sm.fit_resample(X_train, y_train)
+print(f"   ✓ Locked Winner: {model_name}")
+print(f"   ✓ Optimal Threshold: {threshold:.2f}")
 
-# ==============================================================================
-# STEP 1: Fit Final Model
-# ==============================================================================
-print(f"\n[1] Fitting final {CONFIG['model']['name']} model...")
-model = CatBoostClassifier(**CONFIG['model']['params'])
-model.fit(X_train_res, y_train_res)
+# Load test data
+test_df = pd.read_csv(CONFIG['paths']['test_data'])
+X_test = test_df.drop('match', axis=1)
+y_test = test_df['match']
+feature_names = X_test.columns.tolist()
+
+print(f"   ✓ Test samples: {len(X_test)}")
 
 # ==============================================================================
 # LEVEL 1: Surface Metrics (Honest Focus)
 # ==============================================================================
 print("\n" + "="*80)
-print("LEVEL 1: SURFACE METRICS (Focus: Class 1 F1)")
+print("LEVEL 1: SURFACE METRICS (Final Performance)")
 print("="*80)
 
-T = CONFIG['model']['threshold']
-y_probs_test = model.predict_proba(X_test)[:, 1]
-y_pred_test = (y_probs_test >= T)
+if hasattr(pipeline, "predict_proba"):
+    y_probs_test = pipeline.predict_proba(X_test)[:, 1]
+    y_pred_test = (y_probs_test >= threshold)
+else:
+    y_pred_test = pipeline.predict(X_test)
+    y_probs_test = None
 
-print(f"\n📊 Performance on TEST SET (Threshold={T}):")
+print(f"\n📊 FINAL PERFORMANCE ON TEST SET ({model_name}):")
 print(classification_report(y_test, y_pred_test, target_names=['No Match', 'Match']))
 
-roc_auc = roc_auc_score(y_test, y_probs_test)
-print(f"ROC-AUC Score: {roc_auc:.4f}")
-
-# ==============================================================================
-# LEVEL 2: Structure (Bias-Variance via Learning Curves)
-# ==============================================================================
-print("\n" + "="*80)
-print("LEVEL 2: STRUCTURE (Bias-Variance Diagnostic)")
-print("="*80)
-
-print("   Calculating learning curves (using F1 scoring)...")
-train_sizes, train_scores, val_scores = learning_curve(
-    CatBoostClassifier(**CONFIG['model']['params']), 
-    X_train_res, y_train_res, cv=3, scoring='f1', 
-    train_sizes=np.linspace(0.1, 1.0, 5), n_jobs=-1
-)
-
-train_mean = np.mean(train_scores, axis=1)
-val_mean = np.mean(val_scores, axis=1)
-
-gap = train_mean[-1] - val_mean[-1]
-diagnosis = "✓ GOOD" if gap < 0.05 else "⚠️ OVERFITTING"
-print(f"   Gap (Train - Val): {gap:.4f} -> {diagnosis}")
+if y_probs_test is not None:
+    roc_auc = roc_auc_score(y_test, y_probs_test)
+    print(f"ROC-AUC Score: {roc_auc:.4f}")
+else:
+    roc_auc = 0.0
 
 # ==============================================================================
 # LEVEL 3: Deep Dive (Error Surgery)
@@ -127,19 +95,19 @@ print(f"   • Missed Matches     (FN): {fn} (DANGER: Opportunity cost)")
 print(f"   • False Alarms       (FP): {fp} (NOISE: User frustration)")
 
 # ==============================================================================
-# LEVEL 4: Root Cause (Data Quality)
+# LEVEL 4: Root Cause (Outlier Check on Misclassified)
 # ==============================================================================
 print("\n" + "="*80)
 print("LEVEL 4: ROOT CAUSE (Outlier Check on Misclassified)")
 print("="*80)
 
 mis_mask = (y_test != y_pred_test)
-X_test_array = X_test.values
+X_test_array = X_test.select_dtypes(include=[np.number]).values
 z_scores = np.abs((X_test_array - X_test_array.mean(axis=0)) / (X_test_array.std(axis=0) + 1e-8))
 outlier_count = (z_scores > 3).sum(axis=1)
 
-print(f"   • Outlier rate in CORRECT: {outlier_count[~mis_mask].mean():.2f} features/sample")
-print(f"   • Outlier rate in ERRORS:  {outlier_count[mis_mask].mean():.2f} features/sample")
+print(f"   • Outlier rate in CORRECT predictions: {outlier_count[~mis_mask].mean():.2f} features/sample")
+print(f"   • Outlier rate in ERROR predictions:   {outlier_count[mis_mask].mean():.2f} features/sample")
 
 # ==============================================================================
 # LEVEL 5: Operations (Fairness - Gender)
@@ -148,12 +116,13 @@ print("\n" + "="*80)
 print("LEVEL 5: OPERATIONS (Fairness Check - Gender)")
 print("="*80)
 
-genders = X_test['gender'].unique()
-for g in genders:
-    mask = (X_test['gender'] == g)
-    label = "Male" if g == 1 else "Female"
-    f1_g = f1_score(y_test[mask], y_pred_test[mask])
-    print(f"   • {label:6s} (N={mask.sum()}): F1-score = {f1_g:.4f}")
+if 'gender' in X_test.columns:
+    genders = X_test['gender'].unique()
+    for g in genders:
+        mask = (X_test['gender'] == g)
+        label = "Male" if g == 1 else "Female"
+        f1_g = f1_score(y_test[mask], y_pred_test[mask])
+        print(f"   • {label:6s} (N={mask.sum()}): F1-score = {f1_g:.4f}")
 
 # ==============================================================================
 # PLOTTING & SAVING
@@ -161,7 +130,7 @@ for g in genders:
 print("\n[2] Generating 5-Level Diagnostics Dashboard...")
 
 fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-fig.suptitle(f'Diagnostic Dashboard: {CONFIG["model"]["name"]} (Pre-match)', fontsize=16)
+fig.suptitle(f'Final Diagnostic Dashboard: {model_name} (Strictly Decoded)', fontsize=16)
 
 # 1. Confusion Matrix Heatmap
 sns.heatmap(cm, annot=True, fmt='d', cmap='RdYlGn', ax=axes[0,0])
@@ -170,27 +139,33 @@ axes[0,0].set_ylabel('True')
 axes[0,0].set_xlabel('Predicted')
 
 # 2. ROC Curve
-fpr, tpr, _ = roc_curve(y_test, y_probs_test)
-axes[0,1].plot(fpr, tpr, label=f'AUC = {auc(fpr, tpr):.3f}')
-axes[0,1].plot([0, 1], [0, 1], 'k--')
-axes[0,1].set_title('Level 1: ROC Curve')
-axes[0,1].legend()
+if y_probs_test is not None:
+    fpr, tpr, _ = roc_curve(y_test, y_probs_test)
+    axes[0,1].plot(fpr, tpr, label=f'AUC = {auc(fpr, tpr):.3f}')
+    axes[0,1].plot([0, 1], [0, 1], 'k--')
+    axes[0,1].set_title('Level 1: ROC Curve')
+    axes[0,1].legend()
 
-# 3. Learning Curves
-axes[1,0].plot(train_sizes, train_mean, 'o-', label='Train F1')
-axes[1,0].plot(train_sizes, val_mean, 's-', label='Val F1')
-axes[1,0].set_title('Level 2: Learning Curves')
-axes[1,0].legend()
+# 3. Feature Importance (Top 15)
+# Extract actual model from pipeline
+inner_model = pipeline.named_steps['model']
+if hasattr(inner_model, 'feature_importances_'):
+    imp = pd.DataFrame({'feature': feature_names, 'importance': inner_model.feature_importances_}).sort_values('importance', ascending=False)
+    sns.barplot(x='importance', y='feature', data=imp.head(15), ax=axes[1,0])
+    axes[1,0].set_title('Level 5: Top 15 Features')
+elif hasattr(inner_model, 'coef_'):
+    imp = pd.DataFrame({'feature': feature_names, 'importance': np.abs(inner_model.coef_[0])}).sort_values('importance', ascending=False)
+    sns.barplot(x='importance', y='feature', data=imp.head(15), ax=axes[1,0])
+    axes[1,0].set_title('Level 5: Top 15 Coefficients')
 
-# 4. Feature Importance (Top 15)
-imp = pd.DataFrame({'feature': feature_names, 'importance': model.feature_importances_}).sort_values('importance', ascending=False)
-sns.barplot(x='importance', y='feature', data=imp.head(15), ax=axes[1,1])
-axes[1,1].set_title('Level 5: Top 15 Features')
+# 4. Precision-Recall Tradeoff (Optional placeholder for learning info)
+axes[1,1].axis('off')
+axes[1,1].text(0.1, 0.5, f"Winner Model: {model_name}\nOptimal T: {threshold:.2f}\nTest F1: {f1_score(y_test, y_pred_test):.4f}", fontsize=14)
 
 plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-plt.savefig(CONFIG['paths']['plot_dir'] + 'evaluation_diagnostics.png')
+plt.savefig(CONFIG['paths']['plot_dir'] + 'evaluation_diagnostics_final.png')
 
-print(f"\n✓ Dashboard saved to {CONFIG['paths']['plot_dir']}evaluation_diagnostics.png")
+print(f"\n✓ Dashboard saved to {CONFIG['paths']['plot_dir']}evaluation_diagnostics_final.png")
 print("\n" + "="*80)
-print("✓ TASK 05 COMPLETED")
+print("✓ TASK 05 COMPLETED - FINAL DECODING SUCCESSFUL")
 print("="*80)
