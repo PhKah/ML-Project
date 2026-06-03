@@ -43,158 +43,158 @@ Tuân thủ nghiêm ngặt 6 nguyên lý:
 
 ### ✅ Thực thi thành công (Date: 2025-06-03)
 
-#### **Step A: Entity-Level Cleaning**
-- **A1:** Xóa 7 users có >= 5 missing entity values (dropped_iids: [28, 58, 59, 136, 339, 340, 346])
-- **A2:** Lưu age_map từ 544 unique users (cần cho age_gap trước scaling)
-- **A3:** Impute missing entity values (median for numeric, mode for categorical)
-  - age: 32 values imputed
-  - Hobbies: 0 values imputed (đã có đủ data)
-- **A4:** IQR Clip outliers (clips instead of drops)
-  - age: 173 upper values clipped
-  - Multiple hobbies: 1143 total values clipped
+#### **Bước A: Làm sạch dữ liệu thực thể (Entity-Level Cleaning)**
+- **A1:** Xóa 7 người dùng có >= 5 giá trị thực thể bị thiếu (dropped_iids: [28, 58, 59, 136, 339, 340, 346])
+- **A2:** Lưu bản đồ tuổi (age_map) từ 544 người dùng duy nhất (cần cho age_gap trước khi chuẩn hóa)
+- **A3:** Điền giá trị thiếu cho thực thể (trung vị cho dữ liệu số, yếu vị cho dữ liệu phân loại)
+  - age: 32 giá trị đã được điền
+  - Hobbies: 0 giá trị cần điền (đã có đủ dữ liệu)
+- **A4:** Xử lý ngoại lệ bằng IQR Clip (cắt giá trị thay vì xóa hàng)
+  - age: 173 giá trị cận trên đã được cắt
+  - Nhiều sở thích: tổng cộng 1143 giá trị đã được cắt
 
-#### **Step B: Relationship-Level Cleaning**
-- **B1:** Xóa interactions với > 50% missing rating blocks
-  - Removed 133 rows (like/prob block)
-  - Removed 82 additional rows (pf_o ratings block)
-  - Total: 215 interactions deleted
-- **B2:** Synchronize - xóa orphan interactions
-  - Removed 0 orphan interactions (đã đồng bộ trong B1)
-- **B3:** Impute remaining missing in interactions (silent mode, > 200 columns)
+#### **Bước B: Làm sạch dữ liệu quan hệ (Relationship-Level Cleaning)**
+- **B1:** Xóa các tương tác có > 50% khối đánh giá bị thiếu
+  - Đã xóa 133 hàng (khối like/prob)
+  - Đã xóa thêm 82 hàng (khối đánh giá pf_o)
+  - Tổng cộng: 215 tương tác đã bị xóa
+- **B2:** Đồng bộ - xóa các tương tác mồ côi (orphan interactions)
+  - Đã xóa 0 tương tác mồ côi (đã được đồng bộ trong B1)
+- **B3:** Điền các giá trị thiếu còn lại trong tương tác (chế độ im lặng, > 200 cột)
 
-#### **Step D: Scaling**
-- **D0:** Final imputation before scaling (388,302 total missing values across all columns)
-  - Ensures no NaN after scaler.fit_transform()
-- **D1:** MinMax [0,1] scaling applied to 16 columns (like, prob, pf_o_*, hobbies aggregated)
-- **D2:** StandardScaler (Z-score) applied to 3 columns (age, age_gap, age_o)
+#### **Bước D: Chuẩn hóa (Scaling)**
+- **D0:** Điền giá trị thiếu lần cuối trước khi chuẩn hóa (tổng cộng 388,302 giá trị thiếu trên tất cả các cột)
+  - Đảm bảo không còn giá trị NaN sau khi scaler.fit_transform()
+- **D1:** Áp dụng MinMax scaling [0,1] cho 16 cột (like, prob, pf_o_*, gộp sở thích)
+- **D2:** Áp dụng StandardScaler (Z-score) cho 3 cột (age, age_gap, age_o)
 
-#### **Step E: Final Preparation**
-- **E1:** Selected 24 final features for modeling
-- **E2:** Final imputation check: 0 missing values ✓
-- **E3:** Validation checks all passed
+#### **Bước E: Hoàn tất chuẩn bị (Final Preparation)**
+- **E1:** Đã chọn 24 đặc trưng cuối cùng để đưa vào mô hình
+- **E2:** Kiểm tra điền giá trị thiếu lần cuối: 0 giá trị thiếu ✓
+- **E3:** Tất cả các kiểm tra xác thực đã vượt qua
 
-### 📊 Data Quality Metrics
+### 📊 Chỉ số chất lượng dữ liệu (Data Quality Metrics)
 
-| Metric | Value |
+| Chỉ số | Giá trị |
 |--------|-------|
-| Raw data | 8,378 rows × 195 cols |
-| After entity cleaning | 8,299 rows × 195 cols (removed 79 rows from 7 users) |
-| After interaction filtering | 8,084 rows × 195 cols (removed 215 interactions) |
-| Final dataset | 8,084 rows × 24 cols |
-| **Missing values** | **0** ✓ |
-| Duplicates | 0 ✓ |
-| Target distribution | 0: 6,734 (83.30%) / 1: 1,350 (16.70%) |
-| **Class balance** | **16.70% positive** (slightly imbalanced) |
+| Dữ liệu thô | 8,378 hàng × 195 cột |
+| Sau khi làm sạch thực thể | 8,299 hàng × 195 cột (xóa 79 hàng từ 7 người dùng) |
+| Sau khi lọc tương tác | 8,084 hàng × 195 cột (xóa 215 tương tác) |
+| Tập dữ liệu cuối cùng | 8,084 hàng × 24 cột |
+| **Giá trị thiếu** | **0** ✓ |
+| Trùng lặp | 0 ✓ |
+| Phân phối mục tiêu | 0: 6,734 (83.30%) / 1: 1,350 (16.70%) |
+| **Cân bằng lớp** | **16.70% tích cực** (hơi mất cân bằng) |
 
-### 🔍 Key Statistics (Final Data)
+### 🔍 Thống kê chính (Dữ liệu cuối cùng)
 
 ```
-Columns (24):
-  - ID & Target: iid, match
-  - Demographics: gender, age, race, race_o
-  - Ratings: like, prob, like_o, prob_o, age_o, age_gap
-  - Partner Preferences: pf_o_att, pf_o_sin, pf_o_int, pf_o_fun, pf_o_amb, pf_o_sha
-  - Hobby Aggregates (5): fitness_sport, fine_arts, entertainment, social_nightlife, outdoor_wellness
-  - Other: condtn
+Cột (24):
+  - ID & Mục tiêu: iid, match
+  - Nhân khẩu học: gender, age, race, race_o
+  - Đánh giá: like, prob, like_o, prob_o, age_o, age_gap
+  - Sở thích của đối tác: pf_o_att, pf_o_sin, pf_o_int, pf_o_fun, pf_o_amb, pf_o_sha
+  - Gộp sở thích (5): fitness_sport, fine_arts, entertainment, social_nightlife, outdoor_wellness
+  - Khác: condtn
 
-Data type: float64 (20 cols) + int64 (4 cols)
-Scaling applied:
-  - MinMax [0,1]: Ratings, preferences
+Kiểu dữ liệu: float64 (20 cột) + int64 (4 cột)
+Chuẩn hóa đã áp dụng:
+  - MinMax [0,1]: Các đánh giá, sở thích
   - Standard (Z-score): Age, age_gap, age_o
 ```
 
 ## 6. Kết quả & Kiểm chứng (Validation)
 
-### ✅ Passed All Checks (Diagnostics Level 4)
+### ✅ Vượt qua tất cả kiểm tra (Chẩn đoán cấp độ 4)
 
-**Missing Values Check:**
-- ✓ Final dataset: 0 missing values (down from 432,016 in raw data)
-- ✓ All 24 features complete
+**Kiểm tra giá trị thiếu:**
+- ✓ Tập dữ liệu cuối cùng: 0 giá trị thiếu (giảm từ 432,016 trong dữ liệu thô)
+- ✓ Tất cả 24 đặc trưng đã hoàn thiện
 
-**Data Type & Scaling Check:**
-- ✓ Age (Standard scaled): Mean ≈ 0, Std ≈ 1 (from raw mean 26, std 2.5)
-- ✓ Ratings (MinMax scaled): Range [0, 1] (from raw range 1-10)
-- ✓ Hobbies aggregates (MinMax scaled): Range [0, 1]
+**Kiểm tra kiểu dữ liệu & Chuẩn hóa:**
+- ✓ Tuổi (Standard scaled): Trung bình ≈ 0, Độ lệch chuẩn ≈ 1 (từ trung bình thô 26, độ lệch chuẩn 2.5)
+- ✓ Đánh giá (MinMax scaled): Khoảng [0, 1] (từ khoảng thô 1-10)
+- ✓ Gộp sở thích (MinMax scaled): Khoảng [0, 1]
 
-**Referential Integrity Check:**
-- ✓ All 8,084 interactions have valid iid
-- ✓ No orphan rows (interaction without matching user)
-- ✓ No duplicate rows
+**Kiểm tra tính toàn vẹn tham chiếu:**
+- ✓ Tất cả 8,084 tương tác đều có iid hợp lệ
+- ✓ Không có hàng mồ côi (tương tác không có người dùng tương ứng)
+- ✓ Không có hàng trùng lặp
 
-**Class Balance Check:**
-- ✓ Target distribution: 83.30% negative / 16.70% positive
-- ✓ Imbalance ratio: ~5:1 (reasonable for modeling with techniques like SMOTE/class_weight)
+**Kiểm tra cân bằng lớp:**
+- ✓ Phân phối mục tiêu: 83.30% tiêu cực / 16.70% tích cực
+- ✓ Tỷ lệ mất cân bằng: ~5:1 (hợp lý để lập mô hình với các kỹ thuật như SMOTE/class_weight)
 
-### 📁 Output Files
+### 📁 Các tệp đầu ra
 
 ```
 ✓ Data/data_cleaned_entities.csv (5.7 MB)
-  - Full entity-cleaned dataset (8,084 rows × 195 cols)
-  - After steps A1-A4: removed outliers, imputed entity values
-  - Used as reference for understanding Entity-level cleaning
+  - Tập dữ liệu đầy đủ đã làm sạch thực thể (8,084 hàng × 195 cột)
+  - Sau các bước A1-A4: loại bỏ ngoại lệ, điền giá trị thực thể
+  - Dùng làm tham chiếu để hiểu về làm sạch cấp thực thể
   
 ✓ Data/data_final_v2.csv (2.1 MB)
-  - Production-ready dataset for modeling (8,084 rows × 24 cols)
-  - After steps A-E: fully cleaned, engineered, scaled, validated
-  - 0 missing values
-  - Ready for train/validation/test split
+  - Tập dữ liệu sẵn sàng cho mô hình (8,084 hàng × 24 cột)
+  - Sau các bước A-E: đã làm sạch, kỹ thuật đặc trưng, chuẩn hóa, xác thực đầy đủ
+  - 0 giá trị thiếu
+  - Sẵn sàng để chia tập train/validation/test
 ```
 
 ## 7. Khám phá quan trọng & Chẩn đoán lỗi (Insights & Diagnostics)
 
 ### Điểm Nổi Bật
 
-1. **Entity vs Relationship Strategy Hiệu Quả:**
-   - Chỉ xóa 7 users (79 interactions), giữ lại 99.1% data
-   - Imputation strategy bảo toàn entity integrity
-   - Lưu ý: Nếu dùng strategy "delete all missing", sẽ mất 294 interactions (3.6% extra)
+1. **Chiến lược Thực thể vs Quan hệ Hiệu quả:**
+   - Chỉ xóa 7 người dùng (79 tương tác), giữ lại 99.1% dữ liệu
+   - Chiến lược điền giá trị bảo toàn tính toàn vẹn của thực thể
+   - Lưu ý: Nếu dùng chiến lược "xóa tất cả giá trị thiếu", sẽ mất thêm 294 tương tác (thêm 3.6%)
 
-2. **Order-Dependent FE - Tại sao quan trọng:**
-   - age_gap tính từ raw age TRƯỚC scaling → giá trị thực tế
-   - Nếu tính sau scaling → sẽ là |z-score_age1 - z-score_age2| (vô ý nghĩa)
-   - Demonstration: age (raw: mean=26, std=2.5) → age (scaled: mean≈0, std≈1)
+2. **Kỹ thuật đặc trưng phụ thuộc thứ tự (Order-Dependent FE) - Tại sao quan trọng:**
+   - age_gap tính từ tuổi thô TRƯỚC khi chuẩn hóa → giá trị thực tế
+   - Nếu tính sau khi chuẩn hóa → sẽ là |z-score_age1 - z-score_age2| (vô nghĩa)
+   - Minh họa: age (thô: trung bình=26, độ lệch chuẩn=2.5) → age (chuẩn hóa: trung bình≈0, độ lệch chuẩn≈1)
 
-3. **Meaningful Aggregation - 17 hobbies → 5 features:**
+3. **Gộp đặc trưng có ý nghĩa - 17 sở thích → 5 đặc trưng:**
    - Giảm số chiều 70% (17 → 5)
    - Tăng khả năng giải thích
-   - Lợi ích: Mô hình dễ learn, tổng quát hóa tốt hơn
-   - Ví dụ: "fine_arts" group = correlation [museums, art, reading, tv, theater] (ngữ nghĩa)
+   - Lợi ích: Mô hình dễ học và tổng quát hóa tốt hơn
+   - Ví dụ: nhóm "fine_arts" = tương quan giữa [bảo tàng, nghệ thuật, đọc sách, tv, nhà hát] (về mặt ngữ nghĩa)
 
-4. **Scaling Strategy Differentiation:**
-   - MinMax cho ratings (bounded 1-10) → [0, 1]
-   - Standard cho tuổi (unbounded, continuous) → z-score
-   - Không dùng cách scaling duy nhất cho tất cả
+4. **Phân biệt chiến lược chuẩn hóa:**
+   - MinMax cho các đánh giá (giới hạn 1-10) → [0, 1]
+   - Standard cho tuổi (không giới hạn, liên tục) → z-score
+   - Không dùng một cách chuẩn hóa duy nhất cho tất cả
 
-5. **Outlier Handling via IQR Clip:**
-   - Age IQR clip: 173 upper values (potential errors or genuine outliers)
-   - Hobbies IQR clip: 1,143 values total
-   - Lợi ích: Giữ dataset size, loại bỏ extreme noise
-   - Trade-off: Một số extreme values bị "clamped" thay vì dropped
+5. **Xử lý ngoại lệ qua IQR Clip:**
+   - Cắt IQR tuổi: 173 giá trị cận trên (sai sót tiềm ẩn hoặc ngoại lệ thực sự)
+   - Cắt IQR sở thích: tổng cộng 1,143 giá trị
+   - Lợi ích: Giữ nguyên kích thước tập dữ liệu, loại bỏ nhiễu cực đoan
+   - Đánh đổi: Một số giá trị cực đoan bị "ghìm" lại thay vì bị xóa bỏ
 
 ### Lỗi Phổ Biến Tránh Được
 
-1. ❌ **Pitfall 1:** Scaling trước feature engineering order-dependent → Fixed: age_gap trước scaling
-2. ❌ **Pitfall 2:** Xóa user mà không xóa interactions → Fixed: Synchronization B2
-3. ❌ **Pitfall 3:** One-size-fits-all scaling → Fixed: Differentiated MinMax vs Standard
-4. ❌ **Pitfall 4:** Impute relationship data với mean → Fixed: Strategy: delete if > 50% missing
-5. ❌ **Pitfall 5:** fillna(inplace=True) chained assignment → Fixed: Use assignment df[col] = df[col].fillna()
+1. ❌ **Sai lầm 1:** Chuẩn hóa trước khi thực hiện kỹ thuật đặc trưng phụ thuộc thứ tự → Đã sửa: tính age_gap trước khi chuẩn hóa
+2. ❌ **Sai lầm 2:** Xóa người dùng nhưng không xóa các tương tác liên quan → Đã sửa: Đồng bộ hóa ở bước B2
+3. ❌ **Sai lầm 3:** Áp dụng một kiểu chuẩn hóa cho tất cả → Đã sửa: Phân biệt MinMax vs Standard
+4. ❌ **Sai lầm 4:** Điền giá trị thiếu cho dữ liệu quan hệ bằng giá trị trung bình → Đã sửa: Chiến lược: xóa nếu thiếu > 50%
+5. ❌ **Sai lầm 5:** fillna(inplace=True) trong gán chuỗi → Đã sửa: Sử dụng phép gán df[col] = df[col].fillna()
 
 ### Chẩn Đoán Chi Tiết
 
-**Missing Values Before Cleaning:** 432,016 (~2.6% of data)
-- Phần lớn từ post-date surveys (dynamic data)
-- Impact: 215 interactions removed, 388,302+ values imputed across all columns
-- Result: 0 missing values in final dataset ✓
+**Giá trị thiếu trước khi làm sạch:** 432,016 (~2.6% dữ liệu)
+- Phần lớn từ các khảo sát sau khi hẹn hò (dữ liệu động)
+- Tác động: 215 tương tác bị xóa, hơn 388,302 giá trị được điền trên tất cả các cột
+- Kết quả: 0 giá trị thiếu trong tập dữ liệu cuối cùng ✓
 
-**Data Balance for Modeling:**
-- Class imbalance: 16.70% positive (1,350 matches / 6,734 non-matches)
-- Recommendation: Use techniques like SMOTE, class_weight, or threshold tuning in modeling
-- Not critical: Ratio ~5:1 is manageable with proper sampling
+**Cân bằng dữ liệu cho mô hình:**
+- Mất cân bằng lớp: 16.70% tích cực (1,350 cặp khớp / 6,734 cặp không khớp)
+- Khuyến nghị: Sử dụng các kỹ thuật như SMOTE, class_weight, hoặc điều chỉnh ngưỡng trong quá trình lập mô hình
+- Không quá nghiêm trọng: Tỷ lệ ~5:1 có thể xử lý được bằng cách lấy mẫu phù hợp
 
-**Scaling Validation:**
-- Age (raw): min=20, max=50, mean=26.00, std=2.5
-- Age (scaled): min=-2.4, max=9.6, mean≈0, std≈1 ✓
-- Ratings (scaled): min=0, max=1 (all bounded in [0,1]) ✓
+**Xác thực chuẩn hóa:**
+- Tuổi (thô): min=20, max=50, trung bình=26.00, độ lệch chuẩn=2.5
+- Tuổi (chuẩn hóa): min=-2.4, max=9.6, trung bình≈0, độ lệch chuẩn≈1 ✓
+- Đánh giá (chuẩn hóa): min=0, max=1 (tất cả nằm trong khoảng [0,1]) ✓
 
 ## 8. Đồng bộ Tri thức (Knowledge Synchronization)
 

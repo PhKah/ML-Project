@@ -39,62 +39,62 @@
 
 ### ✅ Thực thi thành công (Date: 2025-06-03)
 
-#### **Step 1: Data Loading & Preparation**
-- Loaded `Data/data_final_v2.csv`: 8,084 rows × 24 features
-- Missing values: 0 ✓
-- Target distribution: 83.30% negative (6,734) / 16.70% positive (1,350)
+#### **Bước 1: Tải và Chuẩn bị dữ liệu**
+- Đã tải `Data/data_final_v2.csv`: 8,084 hàng × 24 đặc trưng
+- Giá trị thiếu: 0 ✓
+- Phân phối mục tiêu: 83.30% tiêu cực (6,734) / 16.70% tích cực (1,350)
 
-#### **Step 2: Train/Validation/Test Split (6:2:2)**
-- **Train:** 4,850 rows (60.0%) - for model training
-- **Validation:** 1,617 rows (20.0%) - for hyperparameter tuning
-- **Test:** 1,617 rows (20.0%) - for final evaluation (unseen data)
-- **Stratification:** Class balance maintained across splits (16.70% positive in all)
+#### **Bước 2: Chia tập Train/Validation/Test (6:2:2)**
+- **Train:** 4,850 hàng (60.0%) - dùng để huấn luyện mô hình
+- **Validation:** 1,617 hàng (20.0%) - dùng để tinh chỉnh siêu tham số
+- **Test:** 1,617 hàng (20.0%) - dùng để đánh giá cuối cùng (dữ liệu chưa từng thấy)
+- **Phân tầng (Stratification):** Cân bằng lớp được duy trì qua các lần chia (đều có 16.70% tích cực)
 
-#### **Step 3: Class Imbalance Handling**
-- Used `class_weight='balanced'` parameter in Logistic Regression and Decision Tree
-- Attempted SMOTE but libraries not fully available in environment
-- Strategy: "Cân bằng khi học, Khách quan khi thi" - Train set reweighted, Test set unchanged
+#### **Bước 3: Xử lý mất cân bằng lớp**
+- Sử dụng tham số `class_weight='balanced'` trong Logistic Regression và Decision Tree
+- Đã thử nghiệm SMOTE nhưng thư viện chưa sẵn sàng hoàn toàn trong môi trường
+- Chiến lược: "Cân bằng khi học, Khách quan khi thi" - Tập Train được tính lại trọng số, tập Test giữ nguyên
 
-#### **Step 4: Model Training & Hyperparameter Tuning**
-GridSearchCV with 3-fold Stratified Cross-Validation, scoring='f1_weighted'
+#### **Bước 4: Huấn luyện mô hình & Tinh chỉnh siêu tham số**
+GridSearchCV với 3-fold Stratified Cross-Validation, scoring='f1_weighted'
 
-**Models & Best Parameters:**
+**Mô hình & Siêu tham số tốt nhất:**
 
-| Model | Best Hyperparameters | CV F1 | Train F1 | Val F1 | Test F1 |
+| Mô hình | Siêu tham số tốt nhất | CV F1 | Train F1 | Val F1 | Test F1 |
 |-------|----------------------|-------|----------|---------|---------|
 | **Logistic Regression** ⭐ | C=10, penalty='l2' | 0.8282 | 0.8304 | 0.8088 | **0.8337** |
 | Decision Tree | max_depth=7, min_samples_leaf=4, min_samples_split=10 | 0.8190 | 0.8548 | 0.8049 | 0.8188 |
 | Random Forest | max_depth=15, min_samples_leaf=1, min_samples_split=10 | 0.8238 | 0.9324 | 0.8131 | 0.8218 |
 
-#### **Step 5: Model Comparison & Winner Selection**
+#### **Bước 5: So sánh mô hình & Lựa chọn người chiến thắng**
 
 ```
-🏆 WINNER: Logistic Regression
+🏆 NGƯỜI CHIẾN THẮNG: Logistic Regression
    • Test F1-score: 0.8337
    • Test Accuracy: 0.8571
    • Test Precision: 0.8376
-   • Test Recall: 0.8571 (excellent recall!)
+   • Test Recall: 0.8571 (recall tuyệt vời!)
    • Test ROC-AUC: 0.8281
 ```
 
-**Why Logistic Regression won?**
-- Highest Test F1-score (0.8337)
-- Best generalization (CV F1 ~ Test F1, no overfitting)
-- Stable across folds (std: ±0.0028)
-- Simple, interpretable, fast
+**Tại sao Logistic Regression chiến thắng?**
+- Có F1-score trên tập Test cao nhất (0.8337)
+- Khả năng tổng quát hóa tốt nhất (CV F1 ~ Test F1, không bị quá khớp)
+- Ổn định qua các fold (độ lệch chuẩn: ±0.0028)
+- Đơn giản, dễ giải thích, tốc độ nhanh
 
-#### **Step 6: Overfitting Analysis**
+#### **Bước 6: Phân tích quá khớp (Overfitting Analysis)**
 
 ```
-Overfitting Check (Train F1 - Test F1):
-   Logistic Regression: -0.0032 ✓ Good (slightly underfit is fine)
-   Decision Tree:       +0.0360 ✓ Normal (acceptable difference)
-   Random Forest:       +0.1106 ⚠️ Moderate overfitting (9%+ difference)
+Kiểm tra quá khớp (Train F1 - Test F1):
+   Logistic Regression: -0.0032 ✓ Tốt (hơi dưới khớp một chút là chấp nhận được)
+   Decision Tree:       +0.0360 ✓ Bình thường (chênh lệch có thể chấp nhận)
+   Random Forest:       +0.1106 ⚠️ Quá khớp mức trung bình (chênh lệch > 9%)
 ```
 
-**Conclusion:** Logistic Regression shows the best generalization with minimal gap between training and test performance.
+**Kết luận:** Logistic Regression cho thấy khả năng tổng quát hóa tốt nhất với khoảng cách tối thiểu giữa hiệu năng huấn luyện và kiểm thử.
 
-#### **Step 7: Detailed Classification Report (Test Set)**
+#### **Bước 7: Báo cáo phân loại chi tiết (Tập Test)**
 
 ```
               precision    recall  f1-score   support
@@ -106,124 +106,138 @@ Overfitting Check (Train F1 - Test F1):
 weighted avg       0.84      0.86      0.83      1617
 ```
 
-**Key Insights:**
-- ✓ High precision for "No Match" (0.87) - few false positives
-- ✓ High recall for "No Match" (0.97) - catches most negative cases
-- ⚠️ Low recall for "Match" (0.30) - misses 70% of actual matches (false negatives)
-- **Trade-off:** Model conservative in predicting matches (high specificity, low sensitivity)
+**Khám phá chính:**
+- ✓ Precision cao cho "No Match" (0.87) - ít dự đoán sai về các trường hợp từ chối
+- ✓ Recall cao cho "No Match" (0.97) - bắt được hầu hết các trường hợp tiêu cực
+- ⚠️ Recall thấp cho "Match" (0.30) - bỏ lỡ 70% các cặp thực sự khớp (dương tính giả)
+- **Đánh đổi:** Mô hình thận trọng trong việc dự đoán các cặp khớp (độ đặc hiệu cao, độ nhạy thấp)
 
-#### **Step 8: Feature Importance**
-Logistic Regression uses coefficients (linear weights), not feature_importances_
-- Random Forest top 10 features would be: [extracted from RF model]
-- For linear model: Coefficients indicate feature weight in decision boundary
+#### **Bước 8: Độ quan trọng của đặc trưng**
+Logistic Regression sử dụng các hệ số (trọng số tuyến tính), không phải feature_importances_
+- Top 10 đặc trưng của Random Forest sẽ là: [trích xuất từ mô hình RF]
+- Đối với mô hình tuyến tính: Các hệ số cho biết trọng số của đặc trưng trong ranh giới quyết định
 
-#### **Step 9: Diagnostic Plots Generated**
+#### **Bước 9: Các biểu đồ chẩn đoán đã tạo**
 ```
 ✓ plots/modeling_results.png
-   - Confusion Matrix (Test Set)
-   - ROC Curve (AUC = 0.828)
-   - Model Comparison (Test F1)
-   - Metrics Comparison (F1, Precision, Recall)
+   - Ma trận nhầm lẫn (Tập Test)
+   - Đường cong ROC (AUC = 0.828)
+   - So sánh mô hình (Test F1)
+   - So sánh các chỉ số (F1, Precision, Recall)
 ```
 
 ## 6. Kết quả & Kiểm chứng (Validation)
 
-### ✅ Data Quality Checks
-- [x] No missing values in input data (0/24 columns)
-- [x] Train/Val/Test stratification successful (16.70% positive maintained)
-- [x] No data leakage (separate transformations, test set untouched)
-- [x] Class balance handled appropriately (imbalanced train → imbalanced test)
+### ✅ Kiểm tra chất lượng dữ liệu
+- [x] Không có giá trị thiếu trong dữ liệu đầu vào (0/24 cột)
+- [x] Phân tầng tập Train/Val/Test thành công (duy trì 16.70% tích cực)
+- [x] Không rò rỉ dữ liệu (biến đổi riêng biệt, tập test không bị động đến)
+- [x] Xử lý cân bằng lớp phù hợp (train mất cân bằng → test mất cân bằng)
 
-### ✅ Model Performance Validation
-- [x] CV F1-scores consistent across 3 folds (low std: ±0.0028 for LR)
-- [x] Val F1 ≈ Test F1 (no significant drop indicates good generalization)
-- [x] No extreme overfitting (LR: gap -0.3%, RF: gap 11%)
-- [x] F1-score > Accuracy (appropriate metric for imbalanced data)
-- [x] Precision/Recall trade-off appropriate (high specificity, low sensitivity)
+### ✅ Xác thực hiệu năng mô hình
+- [x] CV F1-score nhất quán qua 3 fold (độ lệch chuẩn thấp: ±0.0028 cho LR)
+- [x] Val F1 ≈ Test F1 (không có sự sụt giảm đáng kể cho thấy tổng quát hóa tốt)
+- [x] Không quá khớp cực đoan (LR: chênh lệch -0.3%, RF: chênh lệch 11%)
+- [x] F1-score > Accuracy (chỉ số phù hợp cho dữ liệu mất cân bằng)
+- [x] Đánh đổi Precision/Recall phù hợp (độ đặc hiệu cao, độ nhạy thấp)
 
-### ✅ Classification Report Validation
-- [x] Weighted F1 (0.83) > Macro F1 (0.66) - reflects class imbalance
-- [x] Precision/Recall trade-off visualized
-- [x] Support counts match split (1347 + 270 = 1617 ✓)
+### ✅ Xác thực báo cáo phân loại
+- [x] Weighted F1 (0.83) > Macro F1 (0.66) - phản ánh sự mất cân bằng lớp
+- [x] Trực quan hóa sự đánh đổi Precision/Recall
+- [x] Số lượng mẫu khớp với việc chia tập (1347 + 270 = 1617 ✓)
 
-### ✅ Output Files Generated
-- [x] `Data/modeling_results.csv` - Model comparison table
-- [x] `plots/modeling_results.png` - 4-panel diagnostic plots
-- [x] Console output logged above
+### ✅ Các tệp đầu ra đã tạo
+- [x] `Data/modeling_results.csv` - Bảng so sánh mô hình
+- [x] `plots/modeling_results.png` - Biểu đồ chẩn đoán 4 bảng
+- [x] Đầu ra console đã được ghi nhật ký ở trên
 
-**Diagnostic Conclusion:** ✅ All validation checks passed. Model ready for evaluation phase.
+**Kết luận chẩn đoán:** ✅ Tất cả các kiểm tra xác thực đã vượt qua. Mô hình đã sẵn sàng cho giai đoạn đánh giá.
 
 ---
 
 ## 7. Khám phá quan trọng & Chẩn đoán (Insights & Diagnostics)
 
-### 1. **Logistic Regression Triumphs - Why?**
-Despite "Advanced Modeling" expectations, simpler models often win on tabular data:
-- **Interpretability:** Each feature has a coefficient (weight in decision)
-- **Generalization:** No overfitting (CV F1 = 0.8282 ≈ Test F1 = 0.8337)
-- **Stability:** Consistent performance across folds (std ±0.0028 is excellent)
-- **Speed:** Fast training, instant predictions for production use
+### 1. **Logistic Regression chiến thắng - Tại sao?**
+Mặc dù có những kỳ vọng vào "Lập mô hình nâng cao", các mô hình đơn giản thường thắng trên dữ liệu dạng bảng:
+- **Khả năng giải thích:** Mỗi đặc trưng đều có một hệ số (trọng số trong quyết định)
+- **Tổng quát hóa:** Không bị quá khớp (CV F1 = 0.8282 ≈ Test F1 = 0.8337)
+- **Sự ổn định:** Hiệu năng nhất quán qua các fold (độ lệch chuẩn ±0.0028 là rất tốt)
+- **Tốc độ:** Huấn luyện nhanh, dự đoán tức thì cho mục đích vận hành
 
-**ML Lesson:** Occam's Razor applies - don't overcomplicate if simpler works better. LR beats RF by 1.5% in Test F1.
+**Bài học ML:** Nguyên lý Occam's Razor được áp dụng - đừng làm phức tạp hóa nếu cái đơn giản hoạt động tốt hơn. LR đánh bại RF 1.5% về Test F1.
 
-### 2. **Class Imbalance Impact on Recall**
-Match prediction recall = 0.30 (misses 70% of actual matches):
-- Binary classification with 16.7% positive class is inherently challenging
-- Model learned conservatively - high specificity (No Match recall 0.97)
-- High precision (0.66) means when it predicts Match, usually correct
-- **Trade-off:** Few false alarms, but also fewer "matches" caught
+### 2. **Tác động của mất cân bằng lớp lên Recall**
+Recall dự đoán khớp = 0.30 (bỏ lỡ 70% các cặp thực sự khớp):
+- Phân loại nhị phân với 16.7% lớp tích cực vốn đã đầy thử thách
+- Mô hình học một cách thận trọng - độ đặc hiệu cao (Recall No Match 0.97)
+- Precision cao (0.66) nghĩa là khi nó dự đoán Khớp, thường là đúng
+- **Đánh đổi:** Ít báo động giả, nhưng cũng ít "cặp khớp" được phát hiện hơn
 
-**Speed Dating Implication:** False negatives (missed matches) might be acceptable; false positives (wrong recommendations) are worse for reputation.
+**Ý nghĩa trong Hẹn hò tốc độ:** Dương tính giả (dự đoán khớp sai) có thể chấp nhận được; âm tính giả (khuyến nghị sai) sẽ tệ hơn cho uy tín của hệ thống.
 
-### 3. **Decision Tree Overfitting Signal**
-- Train F1 = 0.8548, Test F1 = 0.8188 (3.6% gap)
-- Despite max_depth=7 and min_samples constraints, still memorizes
-- **Pattern:** Tree models tend to overfit more than linear models on imbalanced data
+### 3. **Tín hiệu quá khớp của Decision Tree**
+- Train F1 = 0.8548, Test F1 = 0.8188 (chênh lệch 3.6%)
+- Mặc dù đã giới hạn max_depth=7 và min_samples, vẫn còn hiện tượng học thuộc lòng
+- **Đặc điểm:** Các mô hình cây có xu hướng quá khớp nhiều hơn mô hình tuyến tính trên dữ liệu mất cân bằng
 
-### 4. **Random Forest Trade-off**
-- Highest Train F1 (0.9324) but Test F1 = 0.8218 (11% gap)
-- Max_depth=15 allowed deep trees - ensemble couldn't overcome individual overfitting
-- Boosting would likely help more than Bagging here
-- **Finding:** Ensemble power limited when base models overfit
+### 4. **Sự đánh đổi của Random Forest**
+- Train F1 cao nhất (0.9324) nhưng Test F1 = 0.8218 (chênh lệch 11%)
+- Max_depth=15 cho phép các cây quá sâu - việc gộp (ensemble) không thể vượt qua sự quá khớp của từng cây riêng lẻ
+- Boosting có lẽ sẽ giúp ích nhiều hơn Bagging ở đây
+- **Phát hiện:** Sức mạnh của Ensemble bị hạn chế khi các mô hình cơ sở bị quá khớp
 
-### 5. **F1-Score Strategy Validated**
-- All models show F1 = 0.81-0.83 (reasonable range)
-- Weighted F1 appropriately balances classes
-- Model ranking clear: LR > RF > DT
-- **Validated Principle:** F1-score is the right metric for this imbalanced dataset
+### 5. **Chiến lược F1-Score được xác thực**
+- Tất cả các mô hình đều cho F1 = 0.81-0.83 (khoảng hợp lý)
+- Weighted F1 giúp cân bằng các lớp một cách phù hợp
+- Thứ hạng mô hình rõ ràng: LR > RF > DT
+- **Nguyên lý được xác thực:** F1-score là chỉ số đúng cho tập dữ liệu mất cân bằng này
 
-### 6. **Hyperparameter Tuning Effectiveness**
-GridSearchCV found effective parameters:
-- **LR:** C=10 (weak regularization allows model to fit)
-- **DT:** max_depth=7 (reasonable depth, prevents overfitting)
-- **RF:** max_depth=15, min_samples_split=10 (balanced)
+### 6. **Hiệu quả của tinh chỉnh siêu tham số**
+GridSearchCV đã tìm thấy các tham số hiệu quả:
+- **LR:** C=10 (điều chuẩn yếu cho phép mô hình khớp tốt hơn)
+- **DT:** max_depth=7 (độ sâu hợp lý, ngăn ngừa quá khớp)
+- **RF:** max_depth=15, min_samples_split=10 (cân bằng)
 
-All hyperparameters passed sanity checks (no extreme values, reasonable ranges).
+Tất cả các siêu tham số đều vượt qua kiểm tra tính hợp lý (không có giá trị cực đoan, nằm trong khoảng phù hợp).
 
 ---
 
 ## 8. Đồng bộ Tri thức (Knowledge Synchronization)
 
-### ✅ Giai đoạn 4 Principles Applied Successfully
+### ✅ Các nguyên lý Giai đoạn 4 được áp dụng thành công
 
-| Principle | Implementation | Result |
+| Nguyên lý | Thực hiện | Kết quả |
 |-----------|----------------|--------|
-| **Principle 4.1: Class Imbalance Strategy** | class_weight='balanced' | F1=0.83 (balanced metric) |
-| **Principle 4.2: Gradient Boosting for Tabular** | Attempted XGBoost (fallback to RF) | LR outperformed (simplicity wins) |
-| **Principle 4.3: F1-score Primary Metric** | GridSearchCV scoring='f1_weighted' | Model selection by F1, not Accuracy |
-| **Principle 4.4: Hyperparameter Tuning** | GridSearchCV 3-fold CV | Found optimal params per model |
+| **Nguyên lý 4.1: Chiến lược mất cân bằng lớp** | class_weight='balanced' | F1=0.83 (chỉ số cân bằng) |
+| **Nguyên lý 4.2: Gradient Boosting cho dữ liệu bảng** | Đã thử XGBoost (dùng RF làm dự phòng) | LR vượt trội (sự đơn giản thắng thế) |
+| **Nguyên lý 4.3: F1-score là chỉ số chính** | GridSearchCV scoring='f1_weighted' | Lựa chọn mô hình theo F1, không phải Accuracy |
+| **Nguyên lý 4.4: Tinh chỉnh siêu tham số** | GridSearchCV 3-fold CV | Tìm thấy tham số tối ưu cho từng mô hình |
 
-**Finding:** "Simplicity > Complexity" - Logistic Regression beat sophisticated models by applying principles correctly.
+**Phát hiện:** "Đơn giản > Phức tạp" - Logistic Regression đánh bại các mô hình tinh vi bằng cách áp dụng đúng các nguyên lý.
 
-### ✅ Cross-Cutting Principles Maintained
+### ✅ Các nguyên lý xuyên suốt được duy trì
 
-| Principle | Verification |
+| Nguyên lý | Kiểm chứng |
 |-----------|--------------|
-| **Principle C.1: No Data Leakage** | Train/Val/Test separate; scaling not fit on test |
-| **Principle C.2: Entity-Relationship Understanding** | Speed Dating structure preserved throughout |
-| **Principle C.3: Domain Knowledge Priority** | F1-score used due to imbalance; Model simplicity valued |
-| **Principle C.4: Test Set Purity** | Test set used ONLY for final eval, never in tuning |
-| **Principle C.5: Complete Checklist** | All validation checks above passed |
+| **Nguyên lý C.1: Không rò rỉ dữ liệu** | Tập Train/Val/Test tách biệt; chuẩn hóa không khớp trên tập test |
+| **Nguyên lý C.2: Hiểu mô hình Thực thể-Quan hệ** | Cấu trúc Hẹn hò tốc độ được bảo toàn xuyên suốt |
+| **Nguyên lý C.3: Ưu tiên kiến thức chuyên môn** | Dùng F1-score do mất cân bằng; ưu tiên sự đơn giản của mô hình |
+| **Nguyên lý C.4: Tính thuần khiết của tập Test** | Tập Test CHỈ dùng cho đánh giá cuối cùng, không dùng khi tinh chỉnh |
+| **Nguyên lý C.5: Danh sách kiểm tra đầy đủ** | Tất cả các kiểm tra xác thực ở trên đều đã vượt qua |
+
+### ✅ Trạng thái hoàn thành Giai đoạn 4
+
+- [x] Đã huấn luyện trên 3 mô hình (LR, DT, RF; đã thử XGBoost)
+- [x] Tinh chỉnh siêu tham số qua GridSearchCV
+- [x] Kiểm chứng chéo 3-fold stratified cross-validation
+- [x] Xử lý mất cân bằng lớp (balanced_class_weight)
+- [x] F1-score là chỉ số chính
+- [x] So sánh mô hình & lựa chọn người chiến thắng
+- [x] Kiểm tra quá khớp (LR: ✓ Tốt, RF: ⚠️ Trung bình)
+- [x] Kết quả đã được ghi nhật ký, trực quan hóa và lưu lại
+
+**Trạng thái:** ✅ **HOÀN THÀNH GIAI ĐOẠN 4** - Tất cả nguyên lý được áp dụng, mô hình tốt nhất đã được chọn (Logistic Regression, F1=0.8337)
+
 
 ### ✅ Giai đoạn 4 Completion Status
 
