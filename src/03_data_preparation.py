@@ -17,7 +17,7 @@ CONFIG = {
     'features': {
         'entity_cols': [
             'age', 'gender', 'race', 'imprace', 'imprelig', 'goal', 'date', 
-            'go_out', 'career_c', 'exphappy', 'expnum',
+            'go_out', 'career_c', 'exphappy', 'expnum', 'wave',
             'attr1_1', 'sinc1_1', 'intel1_1', 'fun1_1', 'amb1_1', 'shar1_1',
             'attr2_1', 'sinc2_1', 'intel2_1', 'fun2_1', 'amb2_1', 'shar2_1',
             'attr3_1', 'sinc3_1', 'intel3_1', 'fun3_1', 'amb3_1',
@@ -73,6 +73,36 @@ print("=" * 80)
 def load_data(path):
     print(f"\n[1] Loading data from {path}...")
     return pd.read_csv(path, encoding='ISO-8859-1')
+
+def normalize_survey_scales(df):
+    """
+    Waves 6-9 use 1-10 scale. Others use 100-point allocation.
+    We convert 1-10 to 'percentage' (sum to 100) to ensure consistency.
+    """
+    print("\n" + "=" * 40)
+    print("STEP B0: NORMALIZE MIXED SCALES (WAVES 6-9)")
+    print("=" * 40)
+    
+    survey_groups = {
+        'pref': ['attr1_1', 'sinc1_1', 'intel1_1', 'fun1_1', 'amb1_1', 'shar1_1'],
+        'partner': ['attr2_1', 'sinc2_1', 'intel2_1', 'fun2_1', 'amb2_1', 'shar2_1'],
+        'fellow': ['attr4_1', 'sinc4_1', 'intel4_1', 'fun4_1', 'amb4_1', 'shar4_1']
+    }
+    
+    mask_69 = df['wave'].between(6, 9)
+    if mask_69.any():
+        print(f"   Normalizing {mask_69.sum()} rows for waves 6-9")
+        for name, cols in survey_groups.items():
+            valid_cols = [c for c in cols if c in df.columns]
+            # Sum for each person
+            row_sum = df.loc[mask_69, valid_cols].sum(axis=1)
+            # Avoid division by zero
+            row_sum = row_sum.replace(0, 1)
+            # Normalize to 100
+            for col in valid_cols:
+                df.loc[mask_69, col] = (df.loc[mask_69, col] / row_sum) * 100
+                
+    return df
 
 def entity_cleaning(df, config):
     print("\n" + "=" * 40)
@@ -180,7 +210,10 @@ def apply_scaling(df, config):
 if __name__ == "__main__":
     df_raw = load_data(CONFIG['paths']['raw_data'])
     
-    df_entity, age_map = entity_cleaning(df_raw, CONFIG)
+    # NEW: Normalize scales for waves 6-9 before cleaning
+    df_norm = normalize_survey_scales(df_raw)
+    
+    df_entity, age_map = entity_cleaning(df_norm, CONFIG)
     df_rel = relationship_cleaning(df_entity, CONFIG)
     df_fe = feature_engineering(df_rel, age_map, CONFIG)
     
@@ -197,5 +230,6 @@ if __name__ == "__main__":
     df_scaled.to_csv(CONFIG['paths']['final_data'], index=False)
     
     print(f"\n✓ Process completed. Final data: {df_scaled.shape}")
+    print(f"✓ Mixed scales normalized (Waves 6-9 -> 100pt)")
     print(f"✓ Pre-match strategy applied (Anti-leakage)")
     print(f"✓ Saved to: {CONFIG['paths']['final_data']}")
