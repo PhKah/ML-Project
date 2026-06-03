@@ -84,5 +84,13 @@ File này lưu trữ những nguyên lý cốt lõi và tư duy giải quyết v
     *   Thực hiện: `dropped_iids = {user_ids_deleted}`; sau đó `df_inter[df_inter['iid'].isin(dropped_iids)]`
 *   **Nguyên lý:** Entity-Relationship model yêu cầu **tính toàn vẹn tham chiếu (referential integrity)**.
 
+### 5.7 **Tư duy về MLOps và Quy trình Hệ thống (Systematic Workflow)**
+*   **Bản chất:** Code Machine Learning không chỉ là giải thuật, mà là sự kết hợp giữa **Logic** và **Cấu hình**.
+*   **Thực hiện:**
+    *   **Tách biệt Config:** Đưa toàn bộ danh sách thuộc tính, đường dẫn và tham số vào một biến `CONFIG`. Điều này cho phép thử nghiệm hàng chục bộ thuộc tính chỉ bằng cách sửa 1 dòng code, thay vì phải tìm và sửa ở nhiều nơi.
+    *   **Sử dụng Pipeline (ColumnTransformer):** Thay vì viết vòng lặp `for` để scale từng cột, việc dùng `ColumnTransformer` giúp quy trình trở nên chuyên nghiệp, tránh lỗi khi thay đổi thứ tự cột và dễ dàng tích hợp vào các hệ thống production.
+    *   **Module hóa (Functional Programming):** Chia mã nguồn thành các hàm độc lập (`load_data`, `cleaning`, `scaling`) giúp code dễ đọc, dễ bảo trì và dễ viết Unit Test.
+*   **Nguyên lý:** "Code once, config many". Quy trình tốt là quy trình mà việc thay đổi thí nghiệm không đòi hỏi phải thay đổi logic cốt lõi.
+
 ---
 **Tri thức này là của tôi. Tôi đã trải nghiệm nó qua từng dòng code và biểu đồ.**
