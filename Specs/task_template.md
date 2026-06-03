@@ -19,13 +19,6 @@
 *Mô tả: Phần này cung cấp các bước thực hiện đủ chi tiết (tutorial-style) để người dùng có thể tự thực thi. AI sẽ soạn thảo các bước này một cách cụ thể nhất có thể. AI chỉ trực tiếp thực hiện (Run code/Edit file) khi người dùng yêu cầu hỗ trợ hoặc xác nhận "AI thực hiện".*
 
 - [ ] **Bước 1: [Tiêu đề bước]**
-    *   **Mục tiêu cụ thể:** [Kết quả cần đạt được sau bước này]
-    *   **Hướng dẫn chi tiết:** [Mô tả cách làm, các hàm Python/Thư viện gợi ý, logic xử lý]
-    *   **Gợi ý Code/Mã giả:**
-        ```python
-        # Gợi ý logic tại đây
-        ```
-- [ ] **Bước 2: [Tiêu đề bước]**
     *   ...
 
 ## 5. Nhật ký thực thi (Execution Log)
@@ -34,13 +27,18 @@
 ## 6. Kết quả & Kiểm chứng (Validation)
 *   **Số liệu đạt được:** (Accuracy, Precision, Recall, các thông số thống kê...)
 *   **Hình ảnh/Biểu đồ:** (Đường dẫn hoặc mô tả ngắn gọn kết quả trực quan)
-*   **Kiểm tra tính đúng đắn:** (Có bị Data Leakage không? Có bị Overfitting không?)
+*   **Kiểm tra tính đúng đắn (Diagnostics Level 1-2):** (Có bị Data Leakage không? Có bị Overfitting không?)
 
-## 7. Khám phá quan trọng (Insights & Insights Update)
+## 7. Khám phá quan trọng & Chẩn đoán lỗi (Insights & Diagnostics)
 *   **Phát hiện:** (Những điểm bất ngờ từ dữ liệu)
+*   **Chẩn đoán sâu (Diagnostics Level 3-4):** (Phân tích lỗi sai cụ thể, kiểm tra chất lượng dữ liệu GIGO)
 *   **Kết luận:** (Giả thuyết ở mục 1 được chấp nhận hay bác bỏ?)
 
-## 8. Bước tiếp theo
+## 8. Đồng bộ Tri thức (Knowledge Synchronization)
+*   **⚠️ Yêu cầu:** Cập nhật các tư duy mới, bài học rút ra vào file `Logs/Reflection_and_Knowledge_Base.md`.
+*   **Nội dung cập nhật:** (Tóm tắt ngắn gọn những gì sẽ đưa vào file Reflection để phục vụ báo cáo cuối kỳ)
+
+## 9. Bước tiếp theo
 *   (Nhiệm vụ kế tiếp dựa trên kết quả hiện tại)
 
 ---
@@ -48,7 +46,7 @@
 1. File này sẽ được tạo trong folder `Logs/` với tên `[STT]_[TenTask].md`.
 2. AI soạn thảo mục 1-4 với hướng dẫn chi tiết nhất.
 3. Người dùng đọc kỹ và chọn:
-    *   **Tự thực hiện:** Người dùng làm theo hướng dẫn, sau đó cập nhật kết quả vào mục 5-7.
+    *   **Tự thực hiện:** Người dùng làm theo hướng dẫn, sau đó cập nhật kết quả vào mục 5-8.
     *   **AI thực hiện:** Phản hồi **"Duyệt, AI thực hiện"** để AI tự chạy code và cập nhật log.
     *   **Hỗ trợ:** Yêu cầu AI giải thích hoặc thực hiện một bước cụ thể nếu gặp khó khăn.
 ---
