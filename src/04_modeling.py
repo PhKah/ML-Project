@@ -108,7 +108,14 @@ def prepare_and_hide_test(config):
     
     print(f"   ✓ Train: {len(X_train)} | Val: {len(X_val)}")
     print(f"   ✓ Test set (size={len(X_test)}) HIDDEN in {config['paths']['test_data']}")
-    return X_train, X_val, y_train, y_val, X.columns.tolist()
+    
+    # Return 3 feature sets for multi-approach analysis (Kaggle-inspired)
+    participant_cols = [col for col in X.columns if not col.endswith('_o') and col not in ['int_corr', 'samerace', 'wave']]
+    partner_cols = [col for col in X.columns if col.endswith('_o')]
+    interaction_cols = [col for col in X.columns if col in ['int_corr', 'samerace', 'wave'] or 'gap' in col or 'match' in col or 'similarity' in col]
+    
+    return (X_train, X_val, y_train, y_val, X.columns.tolist(),
+            participant_cols, partner_cols, interaction_cols, X_train.columns.tolist())
 
 def find_best_threshold(model, X_val, y_val):
     if not hasattr(model, "predict_proba"):
@@ -176,9 +183,60 @@ def save_winner(results, config):
     return winner_name
 
 if __name__ == "__main__":
-    X_train, X_val, y_train, y_val, f_names = prepare_and_hide_test(CONFIG)
-    results = run_tuning(X_train, X_val, y_train, y_val, CONFIG)
+    X_train, X_val, y_train, y_val, f_names, participant_cols, partner_cols, interaction_cols, all_cols = prepare_and_hide_test(CONFIG)
     
+    print("\n" + "="*80)
+    print("[MULTI-APPROACH ANALYSIS] Comparing 3 modeling strategies (Kaggle-inspired)")
+    print("="*80)
+    
+    # Define 3 feature approaches
+    approaches = {
+        'Participant-Only': [col for col in participant_cols if col in X_train.columns],
+        'Partner-Only': [col for col in partner_cols if col in X_train.columns],
+        'Both + Interactions': all_cols
+    }
+    
+    approach_results = {}
+    
+    for approach_name, feature_list in approaches.items():
+        print(f"\n[Approach: {approach_name}] Using {len(feature_list)} features")
+        
+        X_train_subset = X_train[feature_list]
+        X_val_subset = X_val[feature_list]
+        
+        # Tune models on this feature subset
+        results_subset = run_tuning(X_train_subset, X_val_subset, y_train, y_val, CONFIG)
+        
+        # Pick best model for this approach
+        best_model_name = max(results_subset, key=lambda x: results_subset[x]['val_f1'])
+        best_f1 = results_subset[best_model_name]['val_f1']
+        
+        approach_results[approach_name] = {
+            'best_model': best_model_name,
+            'best_f1': best_f1,
+            'results': results_subset
+        }
+        
+        print(f"   → Best model for {approach_name}: {best_model_name} (F1={best_f1:.4f})")
+    
+    # Save approach comparison
+    approach_summary = []
+    for approach_name, approach_data in approach_results.items():
+        approach_summary.append({
+            'Approach': approach_name,
+            'Best_Model': approach_data['best_model'],
+            'Best_F1': approach_data['best_f1']
+        })
+    
+    pd.DataFrame(approach_summary).to_csv(CONFIG['paths']['plot_dir'] + 'approach_comparison.csv', index=False)
+    print(f"\n✓ Approach comparison saved to {CONFIG['paths']['plot_dir']}approach_comparison.csv")
+    
+    # Run full tuning with all approaches and pick overall winner
+    print("\n" + "="*80)
+    print("[FINAL SELECTION] Tuning all models on full feature set")
+    print("="*80)
+    
+    results = run_tuning(X_train, X_val, y_train, y_val, CONFIG)
     winner = save_winner(results, CONFIG)
     
     # Save Validation Results Summary

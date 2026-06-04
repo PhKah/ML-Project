@@ -131,17 +131,41 @@ def build_dyadic_dataset(df_raw, user_profiles, dropped_iids, config):
     return df_pair
 
 def calculate_dyadic_features(df):
-    """Compute ONLY objective interaction features (no manual multiplications)."""
+    """Compute objective interaction features: gaps, expectations, compatibility."""
     print("\n" + "=" * 40)
     print("STEP C: COMPUTE OBJECTIVE DYADIC FEATURES")
     print("=" * 40)
     
-    # C1: Age Gap (Helpful shortcut for tree models)
+    # C1: Demographic Gaps
     df['age_gap_calc'] = (df['age'] - df['age_o']).abs()
+    df['race_match'] = (df['race'] == df['race_o']).astype(int)
     
-    # C2: Hobbies differences/similarity
-    # We provide the raw columns and 'int_corr' (pre-existing)
-    # The non-linear models will find the interactions themselves.
+    # C2: Expectation-Reality Gaps (Kaggle insight: declared vs actual preference)
+    expectation_cols = ['imprace', 'imprelig']
+    for col in expectation_cols:
+        if col in df.columns and f'{col}_o' in df.columns:
+            df[f'{col}_gap'] = (df[col] - df[f'{col}_o']).abs()
+    
+    # C3: Hobby Compatibility (difference in interests - if major discrepancy)
+    hobby_cols = ['sports', 'tvsports', 'exercise', 'dining', 'museums', 'art', 
+                  'hiking', 'gaming', 'clubbing', 'reading', 'tv', 'theater', 
+                  'movies', 'concerts', 'music', 'shopping', 'yoga']
+    
+    hobby_cols_in_df = [col for col in hobby_cols if col in df.columns and f'{col}_o' in df.columns]
+    if hobby_cols_in_df:
+        df['hobby_similarity'] = 1 - (df[[col for col in hobby_cols_in_df]] - 
+                                      df[[f'{col}_o' for col in hobby_cols_in_df]]).abs().mean(axis=1)
+        print(f"   Created hobby_similarity from {len(hobby_cols_in_df)} hobby pairs")
+    
+    # C4: Goal Alignment (both seeking relationship, both seeking to experience)
+    if 'goal' in df.columns and 'goal_o' in df.columns:
+        df['goal_match'] = (df['goal'] == df['goal_o']).astype(int)
+    
+    # C5: Dating Frequency Match
+    if 'date' in df.columns and 'date_o' in df.columns:
+        df['date_freq_gap'] = (df['date'] - df['date_o']).abs()
+    
+    print(f"   Computed {sum(1 for col in df.columns if 'gap' in col or 'match' in col or 'similarity' in col)} interaction features")
     
     return df
 
