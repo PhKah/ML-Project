@@ -92,5 +92,21 @@ File này lưu trữ những nguyên lý cốt lõi và tư duy giải quyết v
     *   **Module hóa (Functional Programming):** Chia mã nguồn thành các hàm độc lập (`load_data`, `cleaning`, `scaling`) giúp code dễ đọc, dễ bảo trì và dễ viết Unit Test.
 *   **Nguyên lý:** "Code once, config many". Quy trình tốt là quy trình mà việc thay đổi thí nghiệm không đòi hỏi phải thay đổi logic cốt lõi.
 
+## 6. Tư duy về Tối ưu hóa Hệ thống và Sự hội tụ (Optimization & Convergence)
+
+### 6.1 **Reverse Engineering từ Insight - "Số hóa trực giác"**
+*   **Bản chất:** Mô hình phức tạp (Boosting) rất giỏi trong việc tìm ra các "điểm gãy" phi tuyến. Nhiệm vụ của chúng ta là lấy những điểm đó ra và đưa ngược lại vào dữ liệu.
+*   **Thực hiện:** Qua Phân tích Phản sự thực, ta tìm thấy `Age_Gap <= 1.5` là điểm bùng phát. Việc tạo biến `is_age_match` chính là cách ta "dạy" cho các mô hình yếu hơn về quy luật này.
+*   **Nguyên lý:** Đừng chỉ dừng lại ở việc biết mô hình quan trọng cái gì, hãy tìm cách biến cái "quan trọng" đó thành dữ liệu tường minh.
+
+### 6.2 **Sự hội tụ của các thuật toán mạnh (Model Convergence)**
+*   **Phát hiện:** Khi dữ liệu được làm giàu bằng các đặc trưng tinh lọc, khoảng cách giữa các thuật toán hàng đầu (LightGBM, CatBoost, XGBoost) thu hẹp lại.
+*   **Ý nghĩa:** Điều này làm tăng độ tin cậy của hệ thống. Khi nhiều mô hình khác nhau cùng đi đến một kết quả tương đương, ta biết rằng mình đã chạm tới "trần hiệu năng" khách quan của bộ dữ liệu.
+*   **Nguyên lý:** Dữ liệu tốt làm giảm sự phụ thuộc vào sự "thông minh" của thuật toán đơn lẻ.
+
+### 6.3 **Giới hạn của mô hình tuyến tính và Tầm quan trọng của cấu trúc phi tuyến**
+*   **Bài học:** Dù ta có cố gắng "dọn sẵn cỗ" bằng các biến chỉ báo, Logistic Regression vẫn có một ngưỡng trần không thể vượt qua trong các bài toán tâm lý học hành vi phức tạp như Speed Dating.
+*   **Nguyên lý:** Đặc trưng tường minh giúp mô hình hội tụ nhanh hơn, nhưng không thể thay thế hoàn toàn khả năng học các tương tác đa biến của các mô hình dựa trên cây (Tree-based).
+
 ---
 **Tri thức này là của tôi. Tôi đã trải nghiệm nó qua từng dòng code và biểu đồ.**

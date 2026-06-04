@@ -149,6 +149,25 @@ Kế hoạch này tuân thủ nguyên tắc **"Dữ liệu quyết định Công
 - [ ] Kiểm chứng lại các giả thuyết (H1, H2, H3) qua mô hình
 - [ ] Ghi lại "Aha Moments" - những phát hiện bất ngờ
 
+## Giai đoạn 6: Tối ưu hóa hệ thống dựa trên Insight (Optimization & Refinement)
+
+Đây là giai đoạn nâng cao nhằm "suy ngược" tri thức từ mô hình để cải tiến dữ liệu và đơn giản hóa hệ thống.
+
+### 1. Phân tích kịch bản Phản sự thực (Counterfactual Analysis)
+*   **Mục tiêu:** Tìm ra các "Tipping Points" (điểm bùng phát) của các biến quan trọng.
+*   **Hành động:** Sử dụng mô hình mạnh nhất (Gradient Boosting) để chạy các kịch bản "Nếu... thì..." nhằm xác định các ngưỡng cắt thực tế (ví dụ: Age Gap bao nhiêu thì xác suất match rơi tự do).
+
+### 2. Tái cấu trúc đặc trưng (Feature Distillation)
+*   **Nguyên tắc:** Chuyển hóa các quy luật phi tuyến phức tạp thành các biến nhị phân hoặc phân loại mà mô hình đơn giản cũng có thể hiểu.
+*   **Ví dụ:** Tạo biến `Age_OK` (1 nếu gap < 5, 0 nếu ngược lại) thay vì chỉ để AI tự tính toán.
+
+### 3. Vòng lặp Tái đánh giá (Re-benchmarking Loop)
+*   **Hành động:** Chạy lại toàn bộ bảng so sánh (Logistic, Tree, Random Forest, Boosting) trên bộ dữ liệu đã cải tiến.
+*   **Phát hiện hiện tượng "Vượt mặt":** Kiểm tra xem mô hình đơn giản (như Logistic Regression) có đạt hiệu năng ngang ngửa hoặc vượt qua mô hình phức tạp sau khi dữ liệu được "dọn sẵn" hay không.
+
+### 4. Lựa chọn mô hình theo nguyên lý Occam's Razor
+*   **Ưu tiên:** Nếu chênh lệch hiệu năng giữa mô hình đơn giản và phức tạp là không đáng kể (< 1-2% F1-score), hãy lựa chọn **mô hình đơn giản hơn** để tăng tính giải thích và tính bền vững.
+
 ---
 
 ## Nguyên lý Xuyên Suốt (Cross-cutting Principles)

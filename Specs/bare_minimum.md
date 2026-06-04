@@ -35,3 +35,8 @@
 - ❌ Xóa user mà không xóa interaction của họ (data corruption)
 - ❌ Impute relationship data bằng trung bình (tạo dữ liệu giả)
 - ❌ Một cách scaling cho tất cả biến (cần phân biệt thang đo)
+
+## 5. Chiến lược Tối ưu hóa Nâng cao (Advanced Optimization)
+*   **Vòng lặp Insight:** Sử dụng mô hình phi tuyến (Gradient Boosting) để phát hiện các quy luật ngầm, sau đó "suy ngược" để cải tiến dữ liệu.
+*   **Đặc trưng tinh lọc (Distilled Features):** Chuyển hóa các ngưỡng cắt (Tipping Points) tìm được từ phân tích kịch bản thành các biến số đơn giản (ví dụ: `Age_OK`).
+*   **Nguyên lý Occam's Razor:** Ưu tiên mô hình đơn giản (Logistic Regression/Decision Tree) nếu sau khi tối ưu dữ liệu, chúng đạt hiệu năng tương đương với mô hình phức tạp.
