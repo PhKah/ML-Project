@@ -108,5 +108,12 @@ File này lưu trữ những nguyên lý cốt lõi và tư duy giải quyết v
 *   **Bài học:** Dù ta có cố gắng "dọn sẵn cỗ" bằng các biến chỉ báo, Logistic Regression vẫn có một ngưỡng trần không thể vượt qua trong các bài toán tâm lý học hành vi phức tạp như Speed Dating.
 *   **Nguyên lý:** Đặc trưng tường minh giúp mô hình hội tụ nhanh hơn, nhưng không thể thay thế hoàn toàn khả năng học các tương tác đa biến của các mô hình dựa trên cây (Tree-based).
 
+### 6.4 **Tín hiệu Hợp nhất vs. Rời rạc - "Cái nhìn tổng thể vượt trên chi tiết"**
+*   **Phát hiện:** Qua Phân tích Phản sự thực, AI nhạy bén cực độ với `int_corr` (Tương quan sở thích tổng thể) nhưng lại "thờ ơ" với từng `hobby_gap` riêng lẻ.
+*   **Lý giải:** 
+    *   **Vibe King:** Sự tương hợp là kết quả của một "Vibe" tổng thể (Vibe is King). Việc lệch nhau ở một vài sở thích lẻ (như Bóng đá) không quan trọng bằng việc hai người có cùng xu hướng sống hay không.
+    *   **Cơ chế bù trừ (Compensation):** Con người có xu hướng bù trừ các khác biệt nhỏ nếu tổng hòa hệ giá trị là tương đồng. `int_corr` nắm bắt được sự bù trừ này, còn các biến rời rạc thì không.
+*   **Nguyên lý:** Trong các bài toán hành vi phức tạp, các chỉ số **Hợp nhất (Holistic Metrics)** mang hàm lượng tri thức cao hơn nhiều so với phép cộng đơn thuần của các chỉ số **Rời rạc (Granular Metrics)**.
+
 ---
 **Tri thức này là của tôi. Tôi đã trải nghiệm nó qua từng dòng code và biểu đồ.**

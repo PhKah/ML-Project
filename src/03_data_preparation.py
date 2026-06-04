@@ -6,7 +6,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # ============================================================================
-# [KNOWLEDGE-DRIVEN] CONFIGURATION - INTEGRATING TIPPING POINTS
+# [KNOWLEDGE-DRIVEN] CONFIGURATION - INTEGRATING COMPATIBILITY GAPS
 # ============================================================================
 CONFIG = {
     'paths': {
@@ -43,13 +43,13 @@ CONFIG = {
         'standard': ['age']
     },
     'tipping_points': {
-        'age_gap': 2.0,       # From src/08 Counterfactual Analysis
-        'interest_corr': 0.25 # From src/08 Counterfactual Analysis
+        'age_gap': 0.5,       # Refined from src/08 Counterfactual Analysis
+        'interest_corr': 0.30 # Refined from src/08 Counterfactual Analysis
     }
 }
 
 print("=" * 80)
-print("TASK 03: [REFAC] KNOWLEDGE-DRIVEN DATA PREPARATION")
+print("TASK 03: [REFAC] COMPATIBILITY-DRIVEN DATA PREPARATION")
 print("=" * 80)
 
 # ============================================================================
@@ -124,26 +124,44 @@ def build_dyadic_dataset(df_raw, user_profiles, dropped_iids, config):
     return df_pair
 
 def calculate_dyadic_features(df, config):
-    """Compute features including insights from GĐ 6 Counterfactual Analysis."""
+    """Compute features including compatibility gaps (The Principle of Similarity)."""
     print("\n" + "=" * 40)
-    print("STEP C: COMPUTE DYADIC FEATURES (KNOWLEDGE-BASED)")
+    print("STEP C: COMPUTE DYADIC FEATURES (COMPATIBILITY GAPS)")
     print("=" * 40)
     
     # C1: Raw Age Gap
     df['age_gap_calc'] = (df['age'] - df['age_o']).abs()
     
-    # C2: [NEW] Distilled Features from Counterfactual Insights
+    # C2: Hobby Gaps (Similarity in Lifestyle)
+    hobbies = [
+        'sports', 'tvsports', 'exercise', 'dining', 'museums', 'art', 
+        'hiking', 'gaming', 'clubbing', 'reading', 'tv', 'theater', 
+        'movies', 'concerts', 'music', 'shopping', 'yoga'
+    ]
+    for h in hobbies:
+        if h in df.columns and f"{h}_o" in df.columns:
+            df[f'{h}_gap'] = (df[h] - df[f"{h}_o"]).abs()
+            
+    # C3: Expectation Gaps (Similarity in Values)
+    gap_map = {
+        'attr': ('attr1_1', 'attr3_1_o'),
+        'sinc': ('sinc1_1', 'sinc3_1_o'),
+        'intel': ('intel1_1', 'intel3_1_o'),
+        'fun': ('fun1_1', 'fun3_1_o'),
+        'amb': ('amb1_1', 'amb3_1_o'),
+        'shar': ('shar1_1', 'shar3_1_o')
+    }
+    for key, (pref, self_r) in gap_map.items():
+        if pref in df.columns and self_r in df.columns:
+            df[f'{key}_exp_gap'] = (df[pref] - df[self_r]).abs()
+    
+    # C4: Tipping Point Indicators from GĐ 6
     tp = config['tipping_points']
     df['is_age_match'] = (df['age_gap_calc'] <= tp['age_gap']).astype(int)
     df['is_interest_match'] = (df['int_corr'] >= tp['interest_corr']).astype(int)
     df['match_synergy'] = df['is_age_match'] * df['is_interest_match']
     
-    # C3: Expectation vs Reality Gap (Psychological Signal)
-    # Example: How much I value attractiveness vs How much partner rates themselves
-    # (Using Time 1 Preferences vs Partner's Self Rating)
-    df['attr_expectation_gap'] = (df['attr1_1'] - df['attr3_1_o']).abs()
-    
-    print(f"   ✓ Knowledge-based features added (Age Gap TP={tp['age_gap']}, Int Corr TP={tp['interest_corr']})")
+    print(f"   ✓ Integrated 23 Gap features + 3 Tipping point indicators.")
     return df
 
 def apply_scaling(df, config):
@@ -159,8 +177,9 @@ def apply_scaling(df, config):
         if col in df.columns: minmax_list.append(col)
         if f"{col}_o" in df.columns: minmax_list.append(f"{col}_o")
     
-    # Add new continuous interaction features to minmax (since they are mostly bounded)
-    if 'attr_expectation_gap' in df.columns: minmax_list.append('attr_expectation_gap')
+    # Gap features are derived from MinMax [0,1], so they stay in MinMax
+    gap_cols = [c for c in df.columns if '_gap' in c or '_exp_gap' in c]
+    minmax_list.extend(gap_cols)
     
     for col in config['scaling']['standard']:
         if col in df.columns: standard_list.append(col)
@@ -168,7 +187,11 @@ def apply_scaling(df, config):
         
     if 'age_gap_calc' in df.columns: standard_list.append('age_gap_calc')
     
-    # Indicator features (0/1) should NOT be scaled
+    # Ensure lists are unique and exist in df
+    minmax_list = list(set([c for c in minmax_list if c in df.columns]))
+    standard_list = list(set([c for c in standard_list if c in df.columns]))
+    
+    # Indicator features (0/1) and Identifiers should NOT be scaled
     passthrough_list = [c for c in df.columns if c not in minmax_list + standard_list]
     
     ct = ColumnTransformer([
@@ -192,7 +215,7 @@ if __name__ == "__main__":
     user_profiles, dropped_iids = create_user_profiles(df_norm, CONFIG)
     
     # 2. Join into Pair Profiles
-    df_pair = build_dyadic_dataset(df_norm, user_profiles, dropped_iids, CONFIG)
+    df_pair = build_dyadic_dataset(df_raw, user_profiles, dropped_iids, CONFIG)
     
     # 3. Compute Compatibility (Including Knowledge-based features)
     df_fe = calculate_dyadic_features(df_pair, CONFIG)
@@ -207,5 +230,5 @@ if __name__ == "__main__":
     df_scaled.to_csv(CONFIG['paths']['final_data'], index=False)
     
     print(f"\n✓ Process completed. Final data: {df_scaled.shape}")
-    print(f"✓ Tipping points from GĐ 6 integrated into the pipeline.")
+    print(f"✓ Compatibility Gaps & Tipping points integrated into the pipeline.")
     print(f"✓ Saved to: {CONFIG['paths']['final_data']}")

@@ -1,69 +1,62 @@
 # Task 03: Chuẩn bị và Tiền xử lý dữ liệu hệ thống (Systematic Data Preparation)
 
 ## 1. Mục tiêu & Bối cảnh
-*   **Mục tiêu:** Áp dụng quy trình hướng cấu hình (Config-driven) và ML Pipeline để tiền xử lý dữ liệu, đảm bảo tính tái lập và dễ dàng thay đổi thuộc tính.
+*   **Mục tiêu:** Áp dụng quy trình hướng cấu hình (Config-driven) để tiền xử lý dữ liệu, đảm bảo tính tái lập.
 *   **Giai đoạn:** Giai đoạn 3 (Data Preparation) theo `plan.md`.
-*   **Giả thuyết/Câu hỏi:** Việc giữ nguyên bản chất khách quan của dữ liệu (không gộp sở thích, không tự nhân biến so khớp) có giúp mô hình phi tuyến (Boosting) học được các quy luật tốt hơn không?
+*   **Chiến lược Tương hợp (Compatibility Distillation):** Ngoài việc giữ nguyên bản chất khách quan, chúng ta thực hiện "chiết xuất tri thức" bằng cách tính toán trực tiếp các **Biến chênh lệch (Gaps)** và các **Chỉ báo nhạy cảm (Sensitive Indicators)** tìm được từ mô hình.
 
 ## 2. Đầu vào & Đầu ra (Input/Output)
 *   **Đầu vào:** `Data/Speed Dating Data.csv`.
-*   **Mã nguồn:** `src/03_data_preparation.py` (Phiên bản Granular & Objective)
+*   **Mã nguồn:** `src/03_data_preparation.py`.
 *   **Đầu ra:** 
     *   File log này (`Logs/03_Data_Preparation.md`).
-    *   Tập dữ liệu cuối cùng (`Data/data_final_v2.csv`).
+    *   Tập dữ liệu cuối cùng (`Data/data_final_v2.csv`) với 146 đặc trưng.
 
 ## 3. Chiến lược thực hiện (Strategy)
-Tuân thủ nguyên lý **"Dữ liệu quyết định Công cụ"** và **"Khách quan tối đa"**:
-1.  **Granular Features:** Giữ nguyên các biến sở thích rời rạc (ví dụ: `sports` khác `tvsports`) vì chúng phản ánh lối sống khác nhau.
-2.  **Raw Dyadic Pair:** Cung cấp đầy đủ cặp biến đối ứng (Subject Pref vs Partner Self-rating) thay vì tự nhân chúng lại với nhau.
-3.  **Objective Imputation:** Sử dụng median cho các biến liên tục trên bảng User Profile sạch.
-4.  **Referential Integrity:** Đảm bảo mỗi interaction đều có hồ sơ người dùng hợp lệ từ cả hai phía.
+Tuân thủ nguyên lý **"Dữ liệu quyết định Công cụ"** và **"Số hóa sự tương hợp"**:
+1.  **Granular Features:** Giữ nguyên 17 sở thích rời rạc của cả hai bên.
+2.  **Compatibility Gaps:** Bổ sung 17 cột `hobby_gap` và 6 cột `expectation_gap` (abs diff).
+3.  **Refined Tipping Points:** Tinh lọc các ngưỡng cắt dựa trên Phân tích Phản sự thực thực tế:
+    *   **Age Gap:** Rút ngắn xuống **0.5 năm** (điểm rơi xác suất mạnh nhất).
+    *   **Interest Corr:** Nâng lên **0.30** (ngưỡng tin cậy của AI).
+4.  **Referential Integrity:** Đảm bảo tính toàn vẹn hồ sơ thực thể.
 
 ## 4. Hướng dẫn thực hiện chi tiết (Checklist & Tutorial)
 
-### Phase 4: Granular & Objective Refinement (Đã hoàn thành)
-- [x] Tách rời các nhóm sở thích đã gộp trước đó.
-- [x] Loại bỏ các biến `match_` tự tính bằng phép nhân.
-- [x] Giữ lại `age_gap_calc` như một đặc trưng gợi ý (shortcut).
+### Phase 4: Compatibility-Enhanced Refinement (Đã hoàn thành)
+- [x] Tích hợp 23 biến Gap (Chênh lệch sở thích & kỳ vọng).
+- [x] **[REFINED]** Áp dụng 3 biến Tipping Point nhạy cảm (`is_age_match` với 0.5, `is_interest_match` với 0.3).
+- [x] Chuẩn hóa toàn bộ Pipeline theo triết lý "Dẫn dắt bởi tri thức".
 
 ## 5. Nhật ký thực thi (Execution Log)
 
-### ✅ Hoàn thành Phase 4: Granular & Objective Data Prep
-*   *Mục tiêu: Loại bỏ định kiến chủ quan của người lập trình, để mô hình tự tìm ra mối quan hệ giữa các thuộc tính.*
+### ✅ Hoàn thành Phase 4: Knowledge-Driven Data Prep
+*   *Mục tiêu: Chuyển hóa các quy luật phi tuyến nhạy cảm nhất của AI thành đặc trưng tường minh.*
 
 #### **Bước A: Làm sạch hồ sơ người dùng (User Profiles)**
-- **A1:** Trích xuất hồ sơ cá nhân (1 dòng/iid). Xóa 7 người dùng có hồ sơ quá thiếu (> 20 ô).
-- **A2:** Không thực hiện gộp sở thích (Aggregation). Giữ nguyên 17 biến sở thích rời rạc.
-- **A3:** Điền khuyết bằng median và thực hiện IQR Clip để kiềm chế nhiễu.
+- **A1:** Trích xuất hồ sơ cá nhân. Xóa 7 người dùng quá thiếu thông tin.
+- **A2:** Điền khuyết bằng median và thực hiện IQR Clip.
 
 #### **Bước B: Xây dựng hồ sơ cặp đôi (Pair Profiles)**
-- **B1:** Join bảng User Profiles vào bảng Interactions cho cả `iid` và `pid`.
-- **B2:** Referential Integrity: Xóa 10 tương tác mồ côi.
-- **Kết quả:** Dataset có **8,210 hàng x 119 cột**.
+- **B1:** Join bảng User Profiles vào bảng Interactions.
 
-#### **Bước C: Đặc trưng tương tác khách quan**
-- **C1:** Chỉ giữ lại `age_gap_calc` (hiệu số tuổi tuyệt đối).
-- **C2:** Dựa vào `int_corr` sẵn có của dữ liệu thô.
+#### **Bước C: Trích xuất Tính tương hợp (Compatibility Features)**
+- **C1:** Tính 17 biến `hobby_gap`.
+- **C2:** Tính 6 biến `expectation_gap`.
+- **C3:** **[TỐI ƯU CỰC HẠN]** Bổ sung 3 biến Tipping Point nhạy cảm dựa trên biểu đồ kịch bản (Age Gap = 0.5, Interest Corr = 0.3).
+- **Kết quả:** Dataset đạt **8,210 hàng x 146 cột**.
 
-### 📊 Chỉ số chất lượng dữ liệu (Data Quality Metrics - Phase 4)
+### 📊 Chỉ số chất lượng dữ liệu (Data Quality Metrics)
 
 | Chỉ số | Giá trị |
 |--------|-------|
-| Dữ liệu thô | 8,378 hàng × 195 cột |
-| Sau khi làm sạch & Join | 8,210 hàng × 119 cột |
-| **Giá trị thiếu** | **0** ✓ |
-| Phân phối mục tiêu | 0: 6,860 (83.56%) / 1: 1,350 (16.44%) |
-
-### 🔍 Thống kê chính (Dữ liệu Granular)
-```
-Cột (119):
-  - Subject Profile: age, gender, race, goal, 17 hobbies, 5 prefs, 5 self-ratings...
-  - Partner Profile: age_o, race_o, goal_o, 17 hobbies_o, 5 prefs_o, 5 self-ratings_o...
-  - Dyadic: int_corr, age_gap_calc.
-```
+| Dữ liệu sau Join cơ bản | 8,210 hàng × 119 cột |
+| **Dữ liệu sau Enrichment (Gaps)** | **8,210 hàng × 146 cột** |
+| Giá trị thiếu | 0 ✓ |
+| Phân phối mục tiêu | 0: 83.56% / 1: 16.44% |
 
 ## 8. Đồng bộ Tri thức (Knowledge Synchronization)
-*   **Insight:** Việc giữ dữ liệu ở dạng thô (granular) giúp mô hình có nhiều "nguyên liệu" hơn để học các tương tác phức tạp.
+*   **Insight:** AI nhạy cảm với chênh lệch tuổi tác hơn ta tưởng (ngưỡng 0.5 năm thay vì 2 năm). Việc bám sát "thực tế của AI" giúp dữ liệu trở nên cực kỳ tinh khiết.
 
 ## 9. Bước tiếp theo
-*   Chuyển sang huấn luyện lại mô hình với bộ dữ liệu 119 cột.
+*   Chạy lại quy trình huấn luyện để xác nhận hiệu năng trên bộ đặc trưng tinh khiết nhất.

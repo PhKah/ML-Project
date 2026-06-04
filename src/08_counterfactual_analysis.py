@@ -15,10 +15,10 @@ CONFIG = {
         'plot_path': 'plots/counterfactual_scenarios.png'
     },
     'scenarios': [
-        ('age_gap_calc', np.linspace(0, 20, 41), "Age Gap (Years)"),
+        ('age_gap_calc', np.linspace(0, 15, 31), "Age Gap (Years)"),
         ('int_corr', np.linspace(-1, 1, 41), "Interest Correlation"),
-        ('shar1_1', np.linspace(0, 100, 41), "Subject Pref for Shared Interests"),
-        ('tvsports_o', np.linspace(0, 10, 21), "Partner's Interest in Watching Sports")
+        ('shar_gap', np.linspace(0, 1, 21), "Shared Interest Gap (0-1 scaled)"),
+        ('attr_exp_gap', np.linspace(0, 100, 21), "Attractiveness Expectation Gap")
     ]
 }
 
@@ -29,28 +29,39 @@ def load_assets():
     pipeline = winner['pipeline']
     threshold = winner['threshold']
     model_name = winner['name']
-    X_all = df.drop(['iid', 'pid', 'match'], axis=1)
-    return pipeline, threshold, df, X_all, model_name
+    
+    # Get EXACT features used during training
+    train_features = list(pipeline.feature_names_in_)
+    print(f"   ✓ Model expects {len(train_features)} features.")
+    
+    # Pre-select features to avoid any alignment issues later
+    X_all = df[train_features].astype(float)
+    
+    return pipeline, threshold, df, X_all, train_features, model_name
 
 def find_threshold_pair(pipeline, threshold, X_all):
     print(f"[2] Finding a pair close to threshold ({threshold:.4f})...")
+    # Predict using the full pre-selected X
     probs = pipeline.predict_proba(X_all)[:, 1]
     diffs = np.abs(probs - threshold)
     best_idx = np.argmin(diffs)
     print(f"   ✓ Selected row {best_idx} with prob {probs[best_idx]:.4f}")
-    return X_all.iloc[[best_idx]]
+    return X_all.iloc[[best_idx]].copy()
 
-def simulate_scenario(pipeline, typical_df, feature, values):
+def simulate_scenario(pipeline, start_row, feature, values, train_features):
     probs = []
-    temp_df = typical_df.copy()
+    # Work on a copy of the pre-selected row
+    temp_df = start_row.copy()
     for val in values:
         temp_df[feature] = val
-        prob = pipeline.predict_proba(temp_df)[0][1]
+        # Ensure correct column order before prediction
+        input_data = temp_df[train_features]
+        prob = pipeline.predict_proba(input_data)[0][1]
         probs.append(prob)
     return probs
 
 def run_analysis():
-    pipeline, threshold, df, X_all, model_name = load_assets()
+    pipeline, threshold, df, X_all, train_features, model_name = load_assets()
     start_pair = find_threshold_pair(pipeline, threshold, X_all)
     
     print(f"[3] Simulating counterfactual scenarios for {model_name}...")
@@ -64,7 +75,7 @@ def run_analysis():
     tipping_points = {}
     
     for i, (feat, vals, label) in enumerate(CONFIG['scenarios']):
-        probs = simulate_scenario(pipeline, start_pair, feat, vals)
+        probs = simulate_scenario(pipeline, start_pair, feat, vals, train_features)
         
         axes[i].plot(vals, probs, marker='o', linestyle='-', color='teal', linewidth=2)
         axes[i].axhline(y=threshold, color='red', linestyle='--', label=f'Threshold ({threshold:.2f})')
