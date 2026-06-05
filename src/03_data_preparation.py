@@ -41,10 +41,6 @@ CONFIG = {
             'movies', 'concerts', 'music', 'shopping', 'yoga'
         ],
         'standard': ['age']
-    },
-    'tipping_points': {
-        'age_gap': 0.5,
-        'interest_corr': 0.30
     }
 }
 
@@ -82,6 +78,7 @@ def create_user_profiles(df, config):
     
     missing_count = profiles.isnull().sum(axis=1)
     dropped_iids = missing_count[missing_count >= 20].index.tolist()
+    print(f"   [ENTITY DELETION] Dropped {len(dropped_iids)} 'ghost' users with >= 20 missing features.")
     profiles = profiles.drop(dropped_iids)
     
     for col in profiles.columns:
@@ -95,11 +92,20 @@ def create_user_profiles(df, config):
     return profiles, dropped_iids
 
 def build_dyadic_dataset(df_raw, user_profiles, dropped_iids, config):
-    print("\nSTEP B: BUILD PAIR PROFILES (JOIN)")
+    print("\nSTEP B: BUILD PAIR PROFILES (JOIN) & EXPORT PAIR_ID")
     interactions = df_raw[config['features']['interaction_cols']].copy()
+    
+    initial_len = len(interactions)
     interactions = interactions[~interactions['iid'].isin(dropped_iids)]
     interactions = interactions[~interactions['pid'].isin(dropped_iids)]
     interactions = interactions[interactions['pid'].isin(user_profiles.index)]
+    print(f"   [REFERENTIAL INTEGRITY] Dropped {initial_len - len(interactions)} interactions related to ghosts/missing profiles.")
+    
+    # [NEW ARCHITECTURE] Create pair_id for GroupSplit later. DO NOT DEDUPLICATE.
+    interactions['pair_id'] = interactions.apply(
+        lambda x: f"{int(min(x['iid'], x['pid']))}_{int(max(x['iid'], x['pid']))}", axis=1
+    )
+    print(f"   Interactions retained (A->B and B->A intact): {len(interactions)}")
     
     df_pair = interactions.merge(user_profiles, left_on='iid', right_index=True, how='left')
     df_pair = df_pair.merge(user_profiles, left_on='pid', right_index=True, how='left', suffixes=('', '_o'))
@@ -141,13 +147,7 @@ def calculate_ultimate_features(df, config):
         if f'{a}3_1' in df.columns and f'{a}1_1_o' in df.columns:
             df[f'{a}_surplus_31_p'] = df[f'{a}3_1'] - df[f'{a}1_1_o']
     
-    # C4: Tipping points
-    tp = config['tipping_points']
-    df['is_age_match'] = (df['age_gap_calc'] <= tp['age_gap']).astype(int)
-    df['is_interest_match'] = (df['int_corr'] >= tp['interest_corr']).astype(int)
-    df['match_synergy'] = df['is_age_match'] * df['is_interest_match']
-    
-    print(f"   ✓ Integrated Hobby Gaps + 24 Surplus variables + Tipping points.")
+    print(f"   ✓ Integrated Hobby Gaps + 24 Surplus variables. (Indicators removed)")
     return df
 
 def apply_scaling(df, config):
@@ -163,11 +163,12 @@ def apply_scaling(df, config):
     
     # Add new engineered continuous features
     eng_cont = [c for c in df.columns if '_gap' in c or '_surplus_' in c or 'age_gap_calc' in c]
-    # Surplus and Gaps are usually -10 to 10 or 0 to 10, use Standard to keep signs and distributions
     standard_list.extend(eng_cont)
     
     minmax_list = list(set(minmax_list))
     standard_list = list(set(standard_list))
+    
+    # Make sure we don't try to scale string columns like pair_id
     passthrough_list = [c for c in df.columns if c not in minmax_list + standard_list]
     
     ct = ColumnTransformer([
@@ -184,7 +185,7 @@ if __name__ == "__main__":
     user_profiles, dropped_iids = create_user_profiles(df_norm, CONFIG)
     df_pair = build_dyadic_dataset(df_raw, user_profiles, dropped_iids, CONFIG)
     df_fe = calculate_ultimate_features(df_pair, CONFIG)
-    df_fe = df_fe.fillna(df_fe.median())
+    df_fe = df_fe.fillna(df_fe.median(numeric_only=True))
     df_scaled = apply_scaling(df_fe, CONFIG)
     if 'wave' in df_scaled.columns: df_scaled = df_scaled.drop(columns='wave')
     df_scaled.to_csv(CONFIG['paths']['final_data'], index=False)
