@@ -6,7 +6,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # ============================================================================
-# [REFINED] CONFIGURATION - OBJECTIVE & DATA-DRIVEN DYADIC STRATEGY
+# [KNOWLEDGE-DRIVEN] CONFIGURATION - INTEGRATING TIPPING POINTS
 # ============================================================================
 CONFIG = {
     'paths': {
@@ -14,8 +14,6 @@ CONFIG = {
         'final_data': 'Data/data_final_v2.csv'
     },
     'features': {
-        # Static entity features (profile of a single person)
-        # Hobbies are kept granular (e.g., sports vs tvsports) as per user request
         'entity_cols': [
             'age', 'gender', 'race', 'imprace', 'imprelig', 'goal', 'date', 
             'go_out', 'career_c', 'exphappy', 'expnum',
@@ -28,7 +26,6 @@ CONFIG = {
             'hiking', 'gaming', 'clubbing', 'reading', 'tv', 'theater', 
             'movies', 'concerts', 'music', 'shopping', 'yoga'
         ],
-        # Features preserved from interactions
         'interaction_cols': ['iid', 'pid', 'match', 'samerace', 'int_corr', 'condtn', 'wave']
     },
     'scaling': {
@@ -44,11 +41,15 @@ CONFIG = {
             'movies', 'concerts', 'music', 'shopping', 'yoga'
         ],
         'standard': ['age']
+    },
+    'tipping_points': {
+        'age_gap': 2.0,       # From src/08 Counterfactual Analysis
+        'interest_corr': 0.25 # From src/08 Counterfactual Analysis
     }
 }
 
 print("=" * 80)
-print("TASK 03: SYSTEMATIC DATA PREPARATION (GRANULAR & OBJECTIVE)")
+print("TASK 03: [REFAC] KNOWLEDGE-DRIVEN DATA PREPARATION")
 print("=" * 80)
 
 # ============================================================================
@@ -83,21 +84,18 @@ def create_user_profiles(df, config):
     print("=" * 40)
     
     cols = config['features']['entity_cols']
-    # Group by iid to get the first valid static entry
     profiles = df.groupby('iid')[cols].first()
     
-    # A1: Handle Missingness (Relaxed slightly to preserve data)
+    # A1: Handle Missingness
     missing_count = profiles.isnull().sum(axis=1)
     dropped_iids = missing_count[missing_count >= 20].index.tolist()
     profiles = profiles.drop(dropped_iids)
     print(f"   Dropped {len(dropped_iids)} users with >= 20 missing profile values")
     
     # A2: Impute & Clip
-    # Objective Imputation: Median for all continuous features
     for col in profiles.columns:
         if profiles[col].dtype in ['int64', 'float64']:
             profiles[col] = profiles[col].fillna(profiles[col].median())
-            # Clip Outliers using IQR (Standard ML safety)
             if col not in ['gender', 'race', 'goal', 'career_c']:
                 Q1, Q3 = profiles[col].quantile([0.25, 0.75])
                 IQR = Q3 - Q1
@@ -111,62 +109,41 @@ def build_dyadic_dataset(df_raw, user_profiles, dropped_iids, config):
     print("STEP B: BUILD PAIR PROFILES (JOIN)")
     print("=" * 40)
     
-    # B1: Filter interactions
     interactions = df_raw[config['features']['interaction_cols']].copy()
     interactions = interactions[~interactions['iid'].isin(dropped_iids)]
     interactions = interactions[~interactions['pid'].isin(dropped_iids)]
     
-    # B2: Referential Integrity
     initial_len = len(interactions)
     interactions = interactions[interactions['pid'].isin(user_profiles.index)]
     print(f"   Referential Integrity: Dropped {initial_len - len(interactions)} orphan interactions")
     
-    # B3: Merge Subject Profile
     df_pair = interactions.merge(user_profiles, left_on='iid', right_index=True, how='left')
-    
-    # B4: Merge Partner Profile (add suffix _o)
     df_pair = df_pair.merge(user_profiles, left_on='pid', right_index=True, how='left', suffixes=('', '_o'))
     
     print(f"   Merged Subject & Partner profiles. New shape: {df_pair.shape}")
     return df_pair
 
-def calculate_dyadic_features(df):
-    """Compute objective interaction features: gaps, expectations, compatibility."""
+def calculate_dyadic_features(df, config):
+    """Compute features including insights from GĐ 6 Counterfactual Analysis."""
     print("\n" + "=" * 40)
-    print("STEP C: COMPUTE OBJECTIVE DYADIC FEATURES")
+    print("STEP C: COMPUTE DYADIC FEATURES (KNOWLEDGE-BASED)")
     print("=" * 40)
     
-    # C1: Demographic Gaps
+    # C1: Raw Age Gap
     df['age_gap_calc'] = (df['age'] - df['age_o']).abs()
-    df['race_match'] = (df['race'] == df['race_o']).astype(int)
     
-    # C2: Expectation-Reality Gaps (Kaggle insight: declared vs actual preference)
-    expectation_cols = ['imprace', 'imprelig']
-    for col in expectation_cols:
-        if col in df.columns and f'{col}_o' in df.columns:
-            df[f'{col}_gap'] = (df[col] - df[f'{col}_o']).abs()
+    # C2: [NEW] Distilled Features from Counterfactual Insights
+    tp = config['tipping_points']
+    df['is_age_match'] = (df['age_gap_calc'] <= tp['age_gap']).astype(int)
+    df['is_interest_match'] = (df['int_corr'] >= tp['interest_corr']).astype(int)
+    df['match_synergy'] = df['is_age_match'] * df['is_interest_match']
     
-    # C3: Hobby Compatibility (difference in interests - if major discrepancy)
-    hobby_cols = ['sports', 'tvsports', 'exercise', 'dining', 'museums', 'art', 
-                  'hiking', 'gaming', 'clubbing', 'reading', 'tv', 'theater', 
-                  'movies', 'concerts', 'music', 'shopping', 'yoga']
+    # C3: Expectation vs Reality Gap (Psychological Signal)
+    # Example: How much I value attractiveness vs How much partner rates themselves
+    # (Using Time 1 Preferences vs Partner's Self Rating)
+    df['attr_expectation_gap'] = (df['attr1_1'] - df['attr3_1_o']).abs()
     
-    hobby_cols_in_df = [col for col in hobby_cols if col in df.columns and f'{col}_o' in df.columns]
-    if hobby_cols_in_df:
-        df['hobby_similarity'] = 1 - (df[[col for col in hobby_cols_in_df]] - 
-                                      df[[f'{col}_o' for col in hobby_cols_in_df]]).abs().mean(axis=1)
-        print(f"   Created hobby_similarity from {len(hobby_cols_in_df)} hobby pairs")
-    
-    # C4: Goal Alignment (both seeking relationship, both seeking to experience)
-    if 'goal' in df.columns and 'goal_o' in df.columns:
-        df['goal_match'] = (df['goal'] == df['goal_o']).astype(int)
-    
-    # C5: Dating Frequency Match
-    if 'date' in df.columns and 'date_o' in df.columns:
-        df['date_freq_gap'] = (df['date'] - df['date_o']).abs()
-    
-    print(f"   Computed {sum(1 for col in df.columns if 'gap' in col or 'match' in col or 'similarity' in col)} interaction features")
-    
+    print(f"   ✓ Knowledge-based features added (Age Gap TP={tp['age_gap']}, Int Corr TP={tp['interest_corr']})")
     return df
 
 def apply_scaling(df, config):
@@ -177,9 +154,13 @@ def apply_scaling(df, config):
     minmax_list = []
     standard_list = []
     
+    # Identify which columns need which scaling
     for col in config['scaling']['minmax']:
         if col in df.columns: minmax_list.append(col)
         if f"{col}_o" in df.columns: minmax_list.append(f"{col}_o")
+    
+    # Add new continuous interaction features to minmax (since they are mostly bounded)
+    if 'attr_expectation_gap' in df.columns: minmax_list.append('attr_expectation_gap')
     
     for col in config['scaling']['standard']:
         if col in df.columns: standard_list.append(col)
@@ -187,13 +168,16 @@ def apply_scaling(df, config):
         
     if 'age_gap_calc' in df.columns: standard_list.append('age_gap_calc')
     
+    # Indicator features (0/1) should NOT be scaled
+    passthrough_list = [c for c in df.columns if c not in minmax_list + standard_list]
+    
     ct = ColumnTransformer([
         ('minmax', MinMaxScaler(), minmax_list),
         ('standard', StandardScaler(), standard_list)
     ], remainder='passthrough')
     
     vals = ct.fit_transform(df)
-    cols_after = minmax_list + standard_list + [c for c in df.columns if c not in minmax_list + standard_list]
+    cols_after = minmax_list + standard_list + passthrough_list
     
     return pd.DataFrame(vals, columns=cols_after, index=df.index)
 
@@ -204,14 +188,14 @@ if __name__ == "__main__":
     df_raw = load_data(CONFIG['paths']['raw_data'])
     df_norm = normalize_survey_scales(df_raw)
     
-    # 1. Create User Profiles (Entity Level)
+    # 1. Create User Profiles
     user_profiles, dropped_iids = create_user_profiles(df_norm, CONFIG)
     
-    # 2. Join into Pair Profiles (Relationship Level)
+    # 2. Join into Pair Profiles
     df_pair = build_dyadic_dataset(df_norm, user_profiles, dropped_iids, CONFIG)
     
-    # 3. Compute Compatibility (Only objective ones)
-    df_fe = calculate_dyadic_features(df_pair)
+    # 3. Compute Compatibility (Including Knowledge-based features)
+    df_fe = calculate_dyadic_features(df_pair, CONFIG)
     
     # 4. Final Impute & Scaling
     df_fe = df_fe.fillna(df_fe.median())
@@ -223,5 +207,5 @@ if __name__ == "__main__":
     df_scaled.to_csv(CONFIG['paths']['final_data'], index=False)
     
     print(f"\n✓ Process completed. Final data: {df_scaled.shape}")
-    print(f"✓ Granular Hobbies & Objective Dyadic approach applied.")
+    print(f"✓ Tipping points from GĐ 6 integrated into the pipeline.")
     print(f"✓ Saved to: {CONFIG['paths']['final_data']}")
