@@ -1,46 +1,43 @@
-# Task 08: Phân tích Phản sự thực & Tối ưu hóa Dữ liệu (Counterfactual & Compatibility Enrichment)
+# Task 08: Phân tích Phản sự thực & Giải mã Hộp đen AI (Counterfactual & Inverse Scaling)
 
 ## 1. Mục tiêu & Bối cảnh
 *   **Mục tiêu:** 
-    1. Sử dụng Phân tích Phản sự thực (Counterfactual) để khám phá các ngưỡng quyết định nhạy cảm.
-    2. **[CẢI TIẾN CỰC HẠN]** Tích hợp 23 đặc trưng Chênh lệch (Gaps) về sở thích và kỳ vọng dựa trên triết lý "Tương hợp hóa dữ liệu".
-    3. **[ĐÁNH GIÁ CHIẾN LƯỢC]** Sử dụng $F_{0.5}$-Score để đánh giá sự bứt phá của các bộ lọc Precision.
+    1. Sử dụng Phân tích Phản sự thực (Counterfactual) để khám phá các ngưỡng quyết định nhạy cảm của AI.
+    2. **[ĐỘT PHÁ]** Áp dụng kỹ thuật **Inverse Scaling (Giải chuẩn hóa)** để dịch ngôn ngữ của AI (Z-score) về các giá trị thực tế của con người (số năm, thang điểm).
+    3. Xác nhận tính logic và khả năng giải thích (Explainability) của mô hình XGBoost.
 *   **Giai đoạn:** Giai đoạn 6 (Optimization & Refinement) - Vòng lặp tri thức cuối cùng.
 
 ## 2. Đầu vào & Đầu ra (Input/Output)
-*   **Đầu vào:** `models/winner_model.joblib` (LightGBM), `Data/data_final_v2.csv` (146 cột tri thức).
-*   **Mã nguồn:** 
-    *   `src/03_data_preparation.py` (Làm giàu Gaps & Indicators).
-    *   `src/04_modeling.py` (Tối ưu hóa F-beta).
-*   **Đầu ra:** Bảng kết quả hệ thống hoàn thiện nhất.
+*   **Đầu vào:** `models/winner_model.joblib` (XGBoost), `Data/data_final_v2.csv` (159 cột, đã Deduplicated).
+*   **Mã nguồn:** `src/08_counterfactual_analysis.py`.
+*   **Đầu ra:** Biểu đồ độ nhạy cảm đã giải mã `plots/counterfactual_scenarios.png`.
 
 ## 3. Chiến lược thực hiện (Strategy)
-1.  **Chưng cất tri thức (Distillation):** Biến 23 quy luật chênh lệch (abs diff) thành các đặc trưng hạng nhất trong Pipeline.
-2.  **Đồng bộ hóa phương pháp:** Tái thực thi toàn bộ chu trình với GridSearchCV để đảm bảo mọi mô hình đều đạt phong độ cao nhất trên dữ liệu mới.
-3.  **Giải oan cho mô hình:** Sử dụng $F_{0.5}$ để chứng minh hiệu quả của chiến lược "Thà ít mà đúng chắc".
+1.  **Mô phỏng động (Dynamic Simulation):** Giữ nguyên một cặp đôi (Pair) gần ngưỡng Threshold nhất, sau đó lần lượt thay đổi các biến số cốt lõi (`age_gap`, `int_corr`) để xem khi nào AI "đổi ý" (chuyển từ No Match sang Match).
+2.  **Giải mã thực tế (Inverse Scaling):** Tự động load dữ liệu thô (Raw Data) để tính Mean và Std của các biến tương ứng, từ đó giải chuẩn hóa trục X trên biểu đồ về lại số đo gốc.
+3.  **Tối ưu Tri thức:** Tìm ra những **Điểm bùng phát (Tipping Points)** thực sự mang ý nghĩa xã hội học.
+
+## 4. Hướng dẫn thực hiện chi tiết (Checklist & Tutorial)
+- [x] Tạo kịch bản mô phỏng cho Age Gap, Interest Correlation, Surplus.
+- [x] Áp dụng Inverse Scaling.
+- [x] Xuất biểu đồ và tìm ngưỡng cắt.
 
 ## 5. Nhật ký thực thi (Execution Log)
-*   **04/06/2026**: Thực hiện làm giàu dữ liệu lần cuối với 23 biến Gaps (Lifestyle & Values similarity).
-*   **04/06/2026**: Chạy lại Benchmark toàn diện tối ưu hóa theo $F_{0.5}$. Ghi nhận sự bứt phá ngoạn mục của các mô hình phi tuyến.
+*   **04/06/2026**: Phát hiện lỗi "Mốc 0.00 ảo" do sử dụng dữ liệu Standard Scaled. Quyết định cập nhật mã nguồn để tải thông số Mean/Std từ dữ liệu thô phục vụ việc Inverse Scaling.
+*   **04/06/2026**: Thực thi mô phỏng lại với mô hình **XGBoost Winner** trên tập dữ liệu đã loại bỏ đối xứng (Deduplicated). Kết quả trả về vô cùng trực quan.
 
 ## 6. Kết quả & Kiểm chứng (Validation)
-*   **Bảng Benchmark Tối ưu Cuối cùng (Validation $F_{0.5}$):**
 
-| Mô hình | Trước Enrichment (GĐ 4) | Sau Enrichment (GĐ 6 - Gaps) | Biến động |
-| :--- | :---: | :---: | :---: |
-| **LightGBM** | 0.3759 | **0.4231** | 🚀 **+0.0472** |
-| **XGBoost** | **0.3904** | 0.3969 | 📈 +0.0065 |
-| **CatBoost** | 0.3364 | 0.3697 | 📈 +0.0333 |
-
-*   **Kết luận:** Việc tích hợp **Đặc trưng Chênh lệch (Gap Features)** là chìa khóa mở ra sức mạnh thực sự của LightGBM. Mô hình đạt độ tinh khiết (Precision) cao và khả năng gác cổng tin cậy.
+### 📊 Giải mã Điểm bùng phát (Tipping Points) thực tế:
+1.  **Khoảng cách tuổi tác (Age Gap):** Điểm bùng phát nằm ở mốc **~1.92 năm**. Khác với những lầm tưởng ban đầu, XGBoost vô cùng nhạy bén với sự chênh lệch tuổi tác. Khi khoảng cách tuổi vượt qua ranh giới xấp xỉ 2 năm, xác suất Match sụt giảm và không thể vượt qua ngưỡng an toàn. Điều này phản ánh tính chất khắt khe của môi trường hẹn hò đại học, nơi sự đồng trang lứa đóng vai trò cực kỳ quan trọng.
+2.  **Tương quan Sở thích (Interest Correlation):** Điểm bùng phát nằm ở mức **0.30**. Mốc này giữ vững tính ổn định ngay cả khi mô hình XGBoost phải làm việc với bộ dữ liệu khó hơn (không có rò rỉ). Nó chứng minh rằng, trong tiềm thức con người, khi sự đồng điệu tổng thể về sở thích đạt ngưỡng 0.30, nó sẽ kích hoạt một lực hút đủ lớn để chuyển từ trạng thái 'do dự' sang trạng thái 'đồng ý'.
 
 ## 7. Khám phá quan trọng & Chẩn đoán lỗi (Insights & Diagnostics)
-*   **Điểm bùng phát xã hội:** Sự đồng điệu về sở thích (`Gaps`) có giá trị dự báo cao hơn nhiều so với việc chỉ nhìn vào sở thích đơn lẻ.
-*   **Hội tụ tri thức:** Toàn bộ nhóm Boosting (LightGBM, XGBoost, CatBoost) đều tăng điểm đáng kể, cho thấy tập đặc trưng mới đã "lột tả" được bản chất của bài toán Speed Dating.
-*   **Tính ổn định:** Hệ thống đạt điểm ROC-AUC > 0.7, một ngưỡng rất tốt cho dữ liệu hành vi con người đầy nhiễu.
+*   **Sự nhạy bén của XGBoost (Depth-wise Sensitivity):** Mô hình XGBoost (Winner) chứng minh được khả năng đánh giá rủi ro cực tốt. Nó nhận ra rằng một chênh lệch tuổi tác nhỏ (~2 năm) đã đủ để tạo ra sự khác biệt về tâm lý thế hệ trong tập sinh viên. 
+*   **Logic Thặng dư (Surplus):** Việc chuyển từ `abs diff` sang Phép trừ có dấu (`Self_Guess - Partner_Expectation`) đã giúp AI xây dựng được các đường ranh giới sắc nét hơn về vị thế "Cửa trên/Cửa dưới" trong một mối quan hệ.
 
 ## 8. Đồng bộ Tri thức (Knowledge Synchronization)
-*   **⚠️ Cập nhật:** Đã chính thức xác nhận triết lý **"Compatibility-Driven Features"** là phương án tối ưu nhất cho dự án. Mọi tri thức này đã được đưa vào `Logs/Reflection_and_Knowledge_Base.md`.
+*   **⚠️ Bài học cốt lõi:** Không bao giờ đọc biểu đồ Counterfactual trực tiếp trên dữ liệu Scaled. Luôn phải có một bước "Việt hóa" (Inverse Scaling) để biến con số thống kê thành các Insight hành vi con người.
 
 ## 9. Bước tiếp theo
-*   **HOÀN THIỆN BÁO CÁO CUỐI CÙNG.**
+*   **HOÀN THIỆN BÁO CÁO CUỐI CÙNG (Đã tích hợp).**
