@@ -109,7 +109,15 @@ def prepare_and_hide_test(config):
     
     print(f"   ✓ Train: {len(X_train)} | Val: {len(X_val)}")
     print(f"   ✓ Test set (size={len(X_test)}) HIDDEN in {config['paths']['test_data']}")
-    return X_train, X_val, y_train, y_val
+
+    
+    # Return 3 feature sets for multi-approach analysis (Kaggle-inspired)
+    participant_cols = [col for col in X.columns if not col.endswith('_o') and col not in ['int_corr', 'samerace', 'wave']]
+    partner_cols = [col for col in X.columns if col.endswith('_o')]
+    interaction_cols = [col for col in X.columns if col in ['int_corr', 'samerace', 'wave'] or 'gap' in col or 'match' in col or 'similarity' in col]
+    
+    return (X_train, X_val, y_train, y_val, X.columns.tolist(),
+            participant_cols, partner_cols, interaction_cols, X_train.columns.tolist())
 
 def find_best_threshold(model, X_val, y_val):
     """
@@ -180,8 +188,8 @@ def save_winner(results, config):
     return winner_name
 
 if __name__ == "__main__":
-    X_train, X_val, y_train, y_val = prepare_and_hide_test(CONFIG)
-    results = run_tuning(X_train, X_val, y_train, y_val, CONFIG)
+    
+    X_train, X_val, y_train, y_val, f_names, participant_cols, partner_cols, interaction_cols, all_cols = prepare_and_hide_test(CONFIG)
     
     print("\n" + "="*80)
     print("[MULTI-APPROACH ANALYSIS] Comparing 3 modeling strategies (Kaggle-inspired)")
@@ -235,6 +243,7 @@ if __name__ == "__main__":
     print("="*80)
     
     results = run_tuning(X_train, X_val, y_train, y_val, CONFIG)
+    
     winner = save_winner(results, CONFIG)
     
     summary = []

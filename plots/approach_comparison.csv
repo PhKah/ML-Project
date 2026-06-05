@@ -1,0 +1,4 @@
+Approach,Best_Model,Best_F1
+Participant-Only,CatBoost,0.31771894093686354
+Partner-Only,Logistic Regression,0.301255230125523
+Both + Interactions,XGBoost,0.3092269326683292
