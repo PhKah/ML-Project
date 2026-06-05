@@ -6,7 +6,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # ============================================================================
-# [KNOWLEDGE-DRIVEN] CONFIGURATION - INTEGRATING COMPATIBILITY GAPS
+# [ULTIMATE] CONFIGURATION - MULTI-LEVEL COGNITIVE INTEGRATION
 # ============================================================================
 CONFIG = {
     'paths': {
@@ -43,13 +43,13 @@ CONFIG = {
         'standard': ['age']
     },
     'tipping_points': {
-        'age_gap': 0.5,       # Refined from src/08 Counterfactual Analysis
-        'interest_corr': 0.30 # Refined from src/08 Counterfactual Analysis
+        'age_gap': 0.5,
+        'interest_corr': 0.30
     }
 }
 
 print("=" * 80)
-print("TASK 03: [REFAC] COMPATIBILITY-DRIVEN DATA PREPARATION")
+print("TASK 03: [REFAC] ULTIMATE COGNITIVE DATA PREPARATION")
 print("=" * 80)
 
 # ============================================================================
@@ -61,7 +61,6 @@ def load_data(path):
     return pd.read_csv(path, encoding='ISO-8859-1')
 
 def normalize_survey_scales(df):
-    """Normalize Waves 6-9 from 1-10 to 100pt scale for comparison."""
     survey_groups = {
         'pref': ['attr1_1', 'sinc1_1', 'intel1_1', 'fun1_1', 'amb1_1', 'shar1_1'],
         'partner': ['attr2_1', 'sinc2_1', 'intel2_1', 'fun2_1', 'amb2_1', 'shar2_1'],
@@ -69,7 +68,6 @@ def normalize_survey_scales(df):
     }
     mask_69 = df['wave'].between(6, 9)
     if mask_69.any():
-        print(f"   Normalizing {mask_69.sum()} rows for waves 6-9 (1-10 -> 100pt)")
         for cols in survey_groups.values():
             valid_cols = [c for c in cols if c in df.columns]
             row_sum = df.loc[mask_69, valid_cols].sum(axis=1).replace(0, 1)
@@ -78,21 +76,14 @@ def normalize_survey_scales(df):
     return df
 
 def create_user_profiles(df, config):
-    """Extract and clean entity-level profiles (1 row per iid)."""
-    print("\n" + "=" * 40)
-    print("STEP A: CREATE CLEAN USER PROFILES")
-    print("=" * 40)
-    
+    print("\nSTEP A: CREATE CLEAN USER PROFILES")
     cols = config['features']['entity_cols']
     profiles = df.groupby('iid')[cols].first()
     
-    # A1: Handle Missingness
     missing_count = profiles.isnull().sum(axis=1)
     dropped_iids = missing_count[missing_count >= 20].index.tolist()
     profiles = profiles.drop(dropped_iids)
-    print(f"   Dropped {len(dropped_iids)} users with >= 20 missing profile values")
     
-    # A2: Impute & Clip
     for col in profiles.columns:
         if profiles[col].dtype in ['int64', 'float64']:
             profiles[col] = profiles[col].fillna(profiles[col].median())
@@ -104,35 +95,23 @@ def create_user_profiles(df, config):
     return profiles, dropped_iids
 
 def build_dyadic_dataset(df_raw, user_profiles, dropped_iids, config):
-    """Join subject and partner profiles to create Pair Profiles."""
-    print("\n" + "=" * 40)
-    print("STEP B: BUILD PAIR PROFILES (JOIN)")
-    print("=" * 40)
-    
+    print("\nSTEP B: BUILD PAIR PROFILES (JOIN)")
     interactions = df_raw[config['features']['interaction_cols']].copy()
     interactions = interactions[~interactions['iid'].isin(dropped_iids)]
     interactions = interactions[~interactions['pid'].isin(dropped_iids)]
-    
-    initial_len = len(interactions)
     interactions = interactions[interactions['pid'].isin(user_profiles.index)]
-    print(f"   Referential Integrity: Dropped {initial_len - len(interactions)} orphan interactions")
     
     df_pair = interactions.merge(user_profiles, left_on='iid', right_index=True, how='left')
     df_pair = df_pair.merge(user_profiles, left_on='pid', right_index=True, how='left', suffixes=('', '_o'))
-    
-    print(f"   Merged Subject & Partner profiles. New shape: {df_pair.shape}")
     return df_pair
 
-def calculate_dyadic_features(df, config):
-    """Compute features including compatibility gaps (The Principle of Similarity)."""
-    print("\n" + "=" * 40)
-    print("STEP C: COMPUTE DYADIC FEATURES (COMPATIBILITY GAPS)")
-    print("=" * 40)
+def calculate_ultimate_features(df, config):
+    print("\nSTEP C: COMPUTE ULTIMATE COGNITIVE FEATURES")
     
-    # C1: Raw Age Gap
+    # C1: Age Gap
     df['age_gap_calc'] = (df['age'] - df['age_o']).abs()
     
-    # C2: Hobby Gaps (Similarity in Lifestyle)
+    # C2: Hobby Gaps (Similarity - absolute)
     hobbies = [
         'sports', 'tvsports', 'exercise', 'dining', 'museums', 'art', 
         'hiking', 'gaming', 'clubbing', 'reading', 'tv', 'theater', 
@@ -142,56 +121,53 @@ def calculate_dyadic_features(df, config):
         if h in df.columns and f"{h}_o" in df.columns:
             df[f'{h}_gap'] = (df[h] - df[f"{h}_o"]).abs()
             
-    # C3: Expectation Gaps (Similarity in Values)
-    gap_map = {
-        'attr': ('attr1_1', 'attr3_1_o'),
-        'sinc': ('sinc1_1', 'sinc3_1_o'),
-        'intel': ('intel1_1', 'intel3_1_o'),
-        'fun': ('fun1_1', 'fun3_1_o'),
-        'amb': ('amb1_1', 'amb3_1_o'),
-        'shar': ('shar1_1', 'shar3_1_o')
-    }
-    for key, (pref, self_r) in gap_map.items():
-        if pref in df.columns and self_r in df.columns:
-            df[f'{key}_exp_gap'] = (df[pref] - df[self_r]).abs()
+    # C3: Mutual Expectation Surplus (2 Tiers)
+    attrs = ['attr', 'sinc', 'intel', 'fun', 'amb', 'shar']
     
-    # C4: Tipping Point Indicators from GĐ 6
+    for a in attrs:
+        # Tier 1: 5_1 (Conservative/Social Reality)
+        # Surplus S: How much Partner exceeds my expectations
+        if f'{a}5_1_o' in df.columns and f'{a}1_1' in df.columns:
+            df[f'{a}_surplus_51_s'] = df[f'{a}5_1_o'] - df[f'{a}1_1']
+        # Surplus P: How much I exceed Partner's expectations
+        if f'{a}5_1' in df.columns and f'{a}1_1_o' in df.columns:
+            df[f'{a}_surplus_51_p'] = df[f'{a}5_1'] - df[f'{a}1_1_o']
+            
+        # Tier 2: 3_1 (Personal Ego)
+        # Surplus S: How much Partner thinks they exceed my expectations
+        if f'{a}3_1_o' in df.columns and f'{a}1_1' in df.columns:
+            df[f'{a}_surplus_31_s'] = df[f'{a}3_1_o'] - df[f'{a}1_1']
+        # Surplus P: How much I think I exceed Partner's expectations
+        if f'{a}3_1' in df.columns and f'{a}1_1_o' in df.columns:
+            df[f'{a}_surplus_31_p'] = df[f'{a}3_1'] - df[f'{a}1_1_o']
+    
+    # C4: Tipping points
     tp = config['tipping_points']
     df['is_age_match'] = (df['age_gap_calc'] <= tp['age_gap']).astype(int)
     df['is_interest_match'] = (df['int_corr'] >= tp['interest_corr']).astype(int)
     df['match_synergy'] = df['is_age_match'] * df['is_interest_match']
     
-    print(f"   ✓ Integrated 23 Gap features + 3 Tipping point indicators.")
+    print(f"   ✓ Integrated Hobby Gaps + 24 Surplus variables + Tipping points.")
     return df
 
 def apply_scaling(df, config):
-    print("\n" + "=" * 40)
-    print("STEP D: SYSTEMATIC SCALING")
-    print("=" * 40)
+    print("\nSTEP D: SYSTEMATIC SCALING")
+    minmax_list = list(set([c for c in config['scaling']['minmax'] if c in df.columns]))
+    standard_list = list(set([c for c in config['scaling']['standard'] if c in df.columns]))
     
-    minmax_list = []
-    standard_list = []
+    # Add '_o' columns
+    o_minmax = [f"{c}_o" for c in minmax_list if f"{c}_o" in df.columns]
+    o_standard = [f"{c}_o" for c in standard_list if f"{c}_o" in df.columns]
+    minmax_list.extend(o_minmax)
+    standard_list.extend(o_standard)
     
-    # Identify which columns need which scaling
-    for col in config['scaling']['minmax']:
-        if col in df.columns: minmax_list.append(col)
-        if f"{col}_o" in df.columns: minmax_list.append(f"{col}_o")
+    # Add new engineered continuous features
+    eng_cont = [c for c in df.columns if '_gap' in c or '_surplus_' in c or 'age_gap_calc' in c]
+    # Surplus and Gaps are usually -10 to 10 or 0 to 10, use Standard to keep signs and distributions
+    standard_list.extend(eng_cont)
     
-    # Gap features are derived from MinMax [0,1], so they stay in MinMax
-    gap_cols = [c for c in df.columns if '_gap' in c or '_exp_gap' in c]
-    minmax_list.extend(gap_cols)
-    
-    for col in config['scaling']['standard']:
-        if col in df.columns: standard_list.append(col)
-        if f"{col}_o" in df.columns: standard_list.append(f"{col}_o")
-        
-    if 'age_gap_calc' in df.columns: standard_list.append('age_gap_calc')
-    
-    # Ensure lists are unique and exist in df
-    minmax_list = list(set([c for c in minmax_list if c in df.columns]))
-    standard_list = list(set([c for c in standard_list if c in df.columns]))
-    
-    # Indicator features (0/1) and Identifiers should NOT be scaled
+    minmax_list = list(set(minmax_list))
+    standard_list = list(set(standard_list))
     passthrough_list = [c for c in df.columns if c not in minmax_list + standard_list]
     
     ct = ColumnTransformer([
@@ -200,35 +176,16 @@ def apply_scaling(df, config):
     ], remainder='passthrough')
     
     vals = ct.fit_transform(df)
-    cols_after = minmax_list + standard_list + passthrough_list
-    
-    return pd.DataFrame(vals, columns=cols_after, index=df.index)
+    return pd.DataFrame(vals, columns=minmax_list + standard_list + passthrough_list, index=df.index)
 
-# ============================================================================
-# MAIN EXECUTION
-# ============================================================================
 if __name__ == "__main__":
     df_raw = load_data(CONFIG['paths']['raw_data'])
     df_norm = normalize_survey_scales(df_raw)
-    
-    # 1. Create User Profiles
     user_profiles, dropped_iids = create_user_profiles(df_norm, CONFIG)
-    
-    # 2. Join into Pair Profiles
     df_pair = build_dyadic_dataset(df_raw, user_profiles, dropped_iids, CONFIG)
-    
-    # 3. Compute Compatibility (Including Knowledge-based features)
-    df_fe = calculate_dyadic_features(df_pair, CONFIG)
-    
-    # 4. Final Impute & Scaling
+    df_fe = calculate_ultimate_features(df_pair, CONFIG)
     df_fe = df_fe.fillna(df_fe.median())
     df_scaled = apply_scaling(df_fe, CONFIG)
-    
-    # 5. Final Cleanup
     if 'wave' in df_scaled.columns: df_scaled = df_scaled.drop(columns='wave')
-    
     df_scaled.to_csv(CONFIG['paths']['final_data'], index=False)
-    
     print(f"\n✓ Process completed. Final data: {df_scaled.shape}")
-    print(f"✓ Compatibility Gaps & Tipping points integrated into the pipeline.")
-    print(f"✓ Saved to: {CONFIG['paths']['final_data']}")
