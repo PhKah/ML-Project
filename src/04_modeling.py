@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
 import os
-from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedGroupKFold, GroupShuffleSplit
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -91,25 +91,37 @@ def prepare_and_hide_test(config):
     indicators = ['is_age_match', 'is_interest_match', 'match_synergy']
     print(f"   ✓ Indicators found: {[col for col in indicators if col in df.columns]}")
     
-    X = df.drop(['iid', 'pid', 'match'], axis=1)
+    cols_to_drop = ['iid', 'pid', 'match', 'pair_id']
+    
+    X = df.drop(cols_to_drop, axis=1)
     y = df['match']
+    groups = df['pair_id']
     
-    X_train, X_temp, y_train, y_temp = train_test_split(
-        X, y, test_size=(config['experiment']['test_size'] + config['experiment']['val_size']), 
-        random_state=config['experiment']['random_state'], stratify=y
-    )
+    # Use StratifiedGroupKFold to get a locked test set
+    sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=config['experiment']['random_state'])
+    splits = list(sgkf.split(X, y, groups))
     
-    X_val, X_test, y_val, y_test = train_test_split(
-        X_temp, y_temp, test_size=0.5, 
-        random_state=config['experiment']['random_state'], stratify=y_temp
-    )
+    # Fold 0 for Test
+    train_val_idx, test_idx = splits[0]
+    X_train_val, y_train_val, groups_train_val = X.iloc[train_val_idx], y.iloc[train_val_idx], groups.iloc[train_val_idx]
+    X_test, y_test, groups_test = X.iloc[test_idx], y.iloc[test_idx], groups.iloc[test_idx]
     
-    test_df = pd.concat([X_test, y_test], axis=1)
+    # Fold 1 from the remaining data for Validation
+    # Need to re-split train_val into train and val
+    sgkf_val = StratifiedGroupKFold(n_splits=4, shuffle=True, random_state=config['experiment']['random_state'])
+    splits_val = list(sgkf_val.split(X_train_val, y_train_val, groups_train_val))
+    
+    train_idx, val_idx = splits_val[0]
+    X_train, y_train, groups_train = X_train_val.iloc[train_idx], y_train_val.iloc[train_idx], groups_train_val.iloc[train_idx]
+    X_val, y_val, groups_val = X_train_val.iloc[val_idx], y_train_val.iloc[val_idx], groups_train_val.iloc[val_idx]
+    
+    test_df = pd.concat([X_test, y_test, groups_test], axis=1)
     test_df.to_csv(config['paths']['test_data'], index=False)
     
     print(f"   ✓ Train: {len(X_train)} | Val: {len(X_val)}")
+    print(f"   ✓ Features used: {X.shape[1]}")
     print(f"   ✓ Test set (size={len(X_test)}) HIDDEN in {config['paths']['test_data']}")
-    return X_train, X_val, y_train, y_val
+    return X_train, X_val, y_train, y_val, groups_train
 
 def find_best_threshold(model, X_val, y_val):
     """
@@ -126,10 +138,10 @@ def find_best_threshold(model, X_val, y_val):
     best_idx = np.argmax(f_beta_scores)
     return thresholds[best_idx], f_beta_scores[best_idx]
 
-def run_tuning(X_train, X_val, y_train, y_val, config):
+def run_tuning(X_train, X_val, y_train, y_val, groups_train, config):
     print(f"\n[2] Performing Model Tuning on Enriched Data (F-beta Optimized)...")
     results = {}
-    cv = StratifiedKFold(n_splits=config['experiment']['cv_splits'], shuffle=True, random_state=config['experiment']['random_state'])
+    cv = StratifiedGroupKFold(n_splits=config['experiment']['cv_splits'], shuffle=True, random_state=config['experiment']['random_state'])
     
     for name, m_cfg in config['models'].items():
         print(f"    - Tuning {name}...")
@@ -141,7 +153,7 @@ def run_tuning(X_train, X_val, y_train, y_val, config):
         
         # GridSearchCV uses F1 for basic parameter search, but we refine T with F0.5
         gs = GridSearchCV(pipeline, m_cfg['params'], cv=cv, scoring='f1', n_jobs=-1)
-        gs.fit(X_train, y_train)
+        gs.fit(X_train, y_train, groups=groups_train)
         
         best_pipeline = gs.best_estimator_
         best_t, val_f05 = find_best_threshold(best_pipeline, X_val, y_val)
@@ -180,8 +192,8 @@ def save_winner(results, config):
     return winner_name
 
 if __name__ == "__main__":
-    X_train, X_val, y_train, y_val = prepare_and_hide_test(CONFIG)
-    results = run_tuning(X_train, X_val, y_train, y_val, CONFIG)
+    X_train, X_val, y_train, y_val, groups_train = prepare_and_hide_test(CONFIG)
+    results = run_tuning(X_train, X_val, y_train, y_val, groups_train, CONFIG)
     
     winner = save_winner(results, CONFIG)
     
