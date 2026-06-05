@@ -3,16 +3,16 @@
 ## 1. Mục tiêu & Bối cảnh
 *   **Mục tiêu:** 
     1. Giải mã tập dữ liệu ẩn (**Hidden Test Set**) để đánh giá khách quan cuối cùng hiệu năng của mô hình.
-    2. Áp dụng hệ thống chẩn đoán lỗi 5 cấp độ cho mô hình chiến thắng (**LightGBM**).
-    3. Kiểm chứng các giả thuyết nghiên cứu (H1, H2, H3) dựa trên kết quả thực tế.
+    2. Áp dụng hệ thống chẩn đoán lỗi 5 cấp độ cho mô hình chiến thắng (**XGBoost**).
+    3. **[KIẾN TRÚC MỚI]** Cấy ghép các tiêu chuẩn đánh giá nâng cao (PR-AUC, Learning Curve) từ phiên bản V1 để tăng cường độ tin cậy khoa học.
 *   **Giai đoạn:** Giai đoạn 5 (Evaluation & Insights) - Về đích.
 *   **Giả thuyết/Câu hỏi:** 
-    * Mô hình LightGBM có duy trì được F1-score trên tập Test tương đương với tập Validation (không bị overfitting)?
-    * Các đặc trưng Granular (sở thích rời rạc) có thực sự đóng góp vào việc phân loại các mẫu khó không?
+    * Mô hình có duy trì được F1-score trên tập Test tương đương với tập Validation (không bị overfitting)?
+    * Thước đo PR-AUC (Average Precision) có chứng minh được sức mạnh thực sự của mô hình trên lớp thiểu số (Match=1) không?
 
 ## 2. Đầu vào & Đầu ra (Input/Output)
 *   **Đầu vào:** 
-    *   Mô hình đã khóa: `models/winner_model.joblib` (**LightGBM**).
+    *   Mô hình đã khóa: `models/winner_model.joblib`.
     *   Tập Test ẩn: `Data/test_set_hidden.csv`.
 *   **Mã nguồn:** `src/05_evaluation.py`.
 *   **Đầu ra:** 
@@ -22,17 +22,18 @@
 ## 3. Chiến lược thực hiện (Strategy)
 Tuân thủ khung chẩn đoán 5 cấp độ:
 1.  **Bề nổi (Level 1):** Báo cáo Accuracy, Precision, Recall, F1 trên tập Test "tươi".
-2.  **Cấu trúc (Level 2):** Kiểm tra sự chênh lệch (Gap) giữa Val và Test để xác nhận tính ổn định.
+2.  **Cấu trúc (Level 2):** **[CẢI TIẾN]** Sử dụng **PR-AUC (Average Precision)** làm thước đo công bằng cho dữ liệu mất cân bằng.
 3.  **Ẩn sâu (Level 3):** Phân tích Ma trận nhầm lẫn (Confusion Matrix) để hiểu sai số.
 4.  **Gốc rễ (Level 4):** Soi xét các đặc trưng dẫn đến các cú "Match" bất ngờ hoặc bỏ lỡ.
-5.  **Vận hành (Level 5):** Đánh giá ý nghĩa thực tiễn của các Insight (Top Features).
+5.  **Vận hành (Level 5):** **[CẢI TIẾN]** Tích hợp biểu đồ **Learning Curve** (Đường cong học tập) để chẩn đoán mức độ Overfit/Underfit một cách trực quan, làm bằng chứng thép bảo vệ mô hình.
 
 ## 4. Hướng dẫn thực hiện chi tiết (Checklist & Tutorial)
 
-- [x] **Bước 1: Tải mô hình và Dữ liệu Test**
-- [x] **Bước 2: Chạy dự báo một lần duy nhất**
-- [x] **Bước 3: Tổng hợp Metrics**
-- [x] **Bước 4: Trích xuất Insight cuối cùng**
+- [ ] **[KIẾN TRÚC MỚI] Bước 1: Tích hợp Metric PR-AUC (Average Precision)** vào báo cáo Level 1.
+- [ ] **[KIẾN TRÚC MỚI] Bước 2: Bổ sung biểu đồ Learning Curve** vào Dashboard Diagnostic Level 5.
+- [x] **Bước 3: Tải mô hình và Dữ liệu Test**
+- [x] **Bước 4: Chạy dự báo một lần duy nhất**
+- [x] **Bước 5: Tổng hợp Metrics và Insight**
 
 ## 5. Nhật ký thực thi (Execution Log)
 

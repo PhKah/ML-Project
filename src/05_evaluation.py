@@ -6,8 +6,9 @@ import joblib
 import os
 from sklearn.metrics import (
     f1_score, precision_score, recall_score, accuracy_score, roc_auc_score,
-    confusion_matrix, classification_report, roc_curve, auc, fbeta_score
+    confusion_matrix, classification_report, roc_curve, auc, fbeta_score, average_precision_score
 )
+from sklearn.model_selection import learning_curve, StratifiedGroupKFold
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -20,6 +21,7 @@ plt.rcParams['figure.figsize'] = (14, 10)
 # ============================================================================
 CONFIG = {
     'paths': {
+        'input_data': 'Data/data_final_v2.csv',
         'test_data': 'Data/test_set_hidden.csv',
         'winner_model': 'models/winner_model.joblib',
         'plot_dir': 'plots/'
@@ -49,6 +51,10 @@ print(f"   ✓ Optimal Threshold: {threshold:.2f}")
 
 # Load test data
 test_df = pd.read_csv(CONFIG['paths']['test_data'])
+groups_test = None
+if 'pair_id' in test_df.columns:
+    groups_test = test_df['pair_id']
+    test_df = test_df.drop('pair_id', axis=1)
 X_test = test_df.drop('match', axis=1)
 y_test = test_df['match']
 feature_names = X_test.columns.tolist()
@@ -76,12 +82,14 @@ f1 = f1_score(y_test, y_pred_test)
 f05 = fbeta_score(y_test, y_pred_test, beta=0.5, zero_division=0)
 prec = precision_score(y_test, y_pred_test, zero_division=0)
 rec = recall_score(y_test, y_pred_test)
+pr_auc = average_precision_score(y_test, y_probs_test) if y_probs_test is not None else 0
 
 print(f"📈 STRATEGIC METRICS:")
 print(f"   • F1-Score:     {f1:.4f}")
 print(f"   • F0.5-Score:   {f05:.4f} (Precision weight x2)")
 print(f"   • Precision:    {prec:.4f}")
 print(f"   • Recall:       {rec:.4f}")
+print(f"   • PR-AUC:       {pr_auc:.4f}")
 
 if y_probs_test is not None:
     roc_auc = roc_auc_score(y_test, y_probs_test)
@@ -118,6 +126,10 @@ if 'gender' in X_test.columns:
         f1_g = f1_score(y_test[mask], y_pred_test[mask])
         f05_g = fbeta_score(y_test[mask], y_pred_test[mask], beta=0.5, zero_division=0)
         print(f"   • {label:6s} (N={mask.sum():<4}): F1 = {f1_g:.4f} | F0.5 = {f05_g:.4f}")
+else:
+    print(f"   • [SKIPPED] Gender column is no longer available.")
+    print(f"   • [REASON] Dataset is deduplicated by pair_id (min_max), rendering Subject always Female (0).")
+    print(f"   • [INSIGHT] The entire model is natively optimized from a Female perspective.")
 
 # ==============================================================================
 # PLOTTING & SAVING
@@ -136,7 +148,7 @@ axes[0,0].set_xlabel('Predicted')
 # 2. ROC Curve
 if y_probs_test is not None:
     fpr, tpr, _ = roc_curve(y_test, y_probs_test)
-    axes[0,1].plot(fpr, tpr, label=f'AUC = {auc(fpr, tpr):.3f}')
+    axes[0,1].plot(fpr, tpr, label=f'ROC-AUC = {auc(fpr, tpr):.3f}')
     axes[0,1].plot([0, 1], [0, 1], 'k--')
     axes[0,1].set_title('Level 1: ROC Curve')
     axes[0,1].legend()
@@ -152,17 +164,51 @@ elif hasattr(inner_model, 'coef_'):
     sns.barplot(x='importance', y='feature', data=imp.head(15), ax=axes[1,0])
     axes[1,0].set_title('Level 5: Top 15 Coefficients')
 
-# 4. Strategic Summary
-axes[1,1].axis('off')
-summary_text = (
-    f"Winner Model: {model_name}\n"
-    f"Optimal T: {threshold:.2f}\n\n"
-    f"Test F1: {f1:.4f}\n"
-    f"Test F0.5: {f05:.4f}\n"
-    f"Test Precision: {prec:.4f}\n"
-    f"Test Recall: {rec:.4f}"
-)
-axes[1,1].text(0.1, 0.4, summary_text, fontsize=14, fontweight='bold')
+# 4. Learning Curve (Overfit Diagnosis)
+print("   Computing Learning Curve (this might take a moment)...")
+try:
+    df_all = pd.read_csv(CONFIG['paths']['input_data'])
+    cols_to_drop = ['iid', 'pid', 'match']
+    if 'pair_id' not in df_all.columns: cols_to_drop.remove('pair_id') # handle if not there
+    else: cols_to_drop.append('pair_id')
+    if 'gender' in df_all.columns: cols_to_drop.append('gender')
+    if 'gender_o' in df_all.columns: cols_to_drop.append('gender_o')
+    
+    X_all = df_all.drop([c for c in cols_to_drop if c in df_all.columns], axis=1)
+    y_all = df_all['match']
+    groups_all = df_all['pair_id'] if 'pair_id' in df_all.columns else None
+    
+    cv = StratifiedGroupKFold(n_splits=3, shuffle=True, random_state=42)
+    train_sizes, train_scores, test_scores = learning_curve(
+        pipeline, X_all, y_all, groups=groups_all, cv=cv, scoring='f1', n_jobs=-1, 
+        train_sizes=np.linspace(0.1, 1.0, 5)
+    )
+    
+    train_mean = np.mean(train_scores, axis=1)
+    train_std = np.std(train_scores, axis=1)
+    test_mean = np.mean(test_scores, axis=1)
+    test_std = np.std(test_scores, axis=1)
+    
+    axes[1,1].plot(train_sizes, train_mean, 'o-', color='r', label='Training Score')
+    axes[1,1].plot(train_sizes, test_mean, 'o-', color='g', label='Cross-validation Score')
+    axes[1,1].fill_between(train_sizes, train_mean - train_std, train_mean + train_std, alpha=0.1, color='r')
+    axes[1,1].fill_between(train_sizes, test_mean - test_std, test_mean + test_std, alpha=0.1, color='g')
+    axes[1,1].set_title('Level 2: Learning Curve (F1-score)')
+    axes[1,1].set_xlabel('Training Examples')
+    axes[1,1].set_ylabel('Score')
+    axes[1,1].legend(loc="best")
+except Exception as e:
+    print(f"   Could not generate Learning Curve: {e}")
+    axes[1,1].axis('off')
+    summary_text = (
+        f"Winner Model: {model_name}\n"
+        f"Optimal T: {threshold:.2f}\n\n"
+        f"Test F1: {f1:.4f}\n"
+        f"Test F0.5: {f05:.4f}\n"
+        f"Test Precision: {prec:.4f}\n"
+        f"Test Recall: {rec:.4f}"
+    )
+    axes[1,1].text(0.1, 0.4, summary_text, fontsize=14, fontweight='bold')
 
 plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 plt.savefig(CONFIG['paths']['plot_dir'] + 'evaluation_diagnostics_final.png')
