@@ -9,12 +9,11 @@ from sklearn.model_selection import GridSearchCV, StratifiedGroupKFold
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, roc_auc_score, fbeta_score
-from sklearn.preprocessing import MinMaxScaler, StandardScaler,OneHotEncoder
+from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, roc_auc_score, fbeta_score, make_scorer
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
-from imblearn.over_sampling import SMOTE
-from imblearn.pipeline import Pipeline
+from sklearn.pipeline import Pipeline
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 from catboost import CatBoostClassifier
@@ -34,7 +33,8 @@ CONFIG = {
     },
     'experiment': {
         'random_state': 42,
-        'cv_splits': 5
+        'cv_splits': 5,
+        'top_n_features': 40
     },
     'models': {
         'Logistic Regression': {
@@ -91,21 +91,18 @@ def prepare_data(config):
     if 'pair_id' not in df.columns:
         raise KeyError("Column 'pair_id' missing. Ensure src/03 was run correctly.")
         
-    X = df.drop(['iid', 'pid', 'match'], axis=1) # Keep pair_id for split
+    X = df.drop(['iid', 'pid', 'match'], axis=1)
     y = df['match']
     
-    # Stratified Group Split for Test Set
     sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=config['experiment']['random_state'])
     train_val_idx, test_idx = next(sgkf.split(X, y, groups=df['pair_id']))
     
     X_train_val, y_train_val = X.iloc[train_val_idx], y.iloc[train_val_idx]
     X_test, y_test = X.iloc[test_idx], y.iloc[test_idx]
     
-    # Save Test set (Hidden)
     test_df = pd.concat([X_test, y_test], axis=1)
     test_df.to_csv(config['paths']['test_data'], index=False)
     
-    # Split train_val into train and val
     sgkf_val = StratifiedGroupKFold(n_splits=4, shuffle=True, random_state=config['experiment']['random_state'])
     train_idx, val_idx = next(sgkf_val.split(X_train_val, y_train_val, groups=X_train_val['pair_id']))
     
@@ -119,15 +116,25 @@ def prepare_data(config):
     print(f"   ✓ Train: {len(X_train)} | Val: {len(X_val)} | Test: {len(X_test)}")
     return X_train, X_val, y_train, y_val, groups_train
 
-def build_pipeline(classifier, X):
-    all_cols = set(X.columns.tolist())
+def select_best_features(X_train, y_train, config):
+    print(f"\n[1b] Feature Selection (Top {config['experiment']['top_n_features']} by Importance)...")
+    X_tmp = X_train.fillna(X_train.median())
+    selector_clf = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, class_weight='balanced')
+    selector_clf.fit(X_tmp, y_train)
     
-    # 1. Định nghĩa nhóm Standard (Thặng dư & Biến liên tục không giới hạn)
+    importances = pd.Series(selector_clf.feature_importances_, index=X_train.columns)
+    top_features = importances.sort_values(ascending=False).head(config['experiment']['top_n_features']).index.tolist()
+    
+    print(f"   ✓ Selected {len(top_features)} features.")
+    return top_features
+
+def build_pipeline(classifier, X_cols):
+    all_cols = set(X_cols)
+    
     surplus_cols = {c for c in all_cols if '_surplus' in c}
     cont_cols = {'age', 'age_o', 'age_gap_calc'}
     standard_cols = (surplus_cols | cont_cols) & all_cols
     
-    # 2. Định nghĩa nhóm MinMax (Khoảng cách & Thang điểm cố định 0-10)
     gap_cols = {c for c in all_cols if '_gap' in c} - standard_cols
     score_cols = {c for c in all_cols if c in [
         'sports', 'tvsports', 'exercise', 'dining', 'museums', 'art', 
@@ -137,14 +144,11 @@ def build_pipeline(classifier, X):
     ] or (c.endswith('_o') and any(sub in c for sub in ['sports', 'dining', 'art', 'museums']))} - standard_cols
     minmax_cols = (gap_cols | score_cols) & all_cols
     
-    # 3. Định nghĩa nhóm Categories (Nominal features)
     cat_base = {'gender', 'race', 'goal', 'career_c', 'condtn', 'samerace'}
     cat_cols = {c for c in all_cols if any(b == c or f"{b}_o" == c for b in cat_base)} & all_cols
     
-    # 4. Nhóm còn lại (Passthrough - giữ nguyên nhưng vẫn điền khuyết)
     remaining_cols = all_cols - standard_cols - minmax_cols - cat_cols
     
-    # Xây dựng các Sub-pipelines
     minmax_pipe = Pipeline([
         ('imputer', SimpleImputer(strategy='median')),
         ('scaler', MinMaxScaler())
@@ -155,19 +159,16 @@ def build_pipeline(classifier, X):
         ('scaler', StandardScaler())
     ])
     
-    # [NEW LOGIC] One-Hot Encoding chỉ dành cho Logistic Regression
     if isinstance(classifier, LogisticRegression):
         cat_pipe = Pipeline([
             ('imputer', SimpleImputer(strategy='most_frequent')),
             ('ohe', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
         ])
     else:
-        # Đối với các mô hình cây (XGB, CatBoost, v.v.), giữ nguyên nhãn số (Passthrough sau khi điền khuyết)
         cat_pipe = SimpleImputer(strategy='most_frequent')
     
     passthrough_pipe = SimpleImputer(strategy='median')
 
-    # ColumnTransformer đảm bảo mỗi cột chỉ xuất hiện 1 lần
     transformer = ColumnTransformer([
         ('minmax', minmax_pipe, list(minmax_cols)),
         ('standard', standard_pipe, list(standard_cols)),
@@ -177,53 +178,61 @@ def build_pipeline(classifier, X):
     
     return Pipeline([
         ('preprocessor', transformer),
-        ('smote', SMOTE(random_state=42)),
         ('clf', classifier)
     ])
 
 def find_best_threshold(pipeline, X_val, y_val):
     if not hasattr(pipeline, "predict_proba"):
-        return 0.5, fbeta_score(y_val, pipeline.predict(X_val), beta=0.5)
+        return 0.5, f1_score(y_val, pipeline.predict(X_val))
     
     y_probs = pipeline.predict_proba(X_val)[:, 1]
     thresholds = np.linspace(0.01, 0.99, 99)
-    scores = [fbeta_score(y_val, y_probs >= t, beta=0.5, zero_division=0) for t in thresholds]
+    scores = [f1_score(y_val, y_probs >= t, zero_division=0) for t in thresholds]
     
     best_idx = np.argmax(scores)
     return thresholds[best_idx], scores[best_idx]
 
 def run_tuning(X_train, X_val, y_train, y_val, groups_train, config):
-    print(f"\n[2] Executing Leakage-Free GridSearchCV...")
+    print(f"\n[2] Executing Leakage-Free GridSearchCV (Target: F1)...")
     results = {}
     cv = StratifiedGroupKFold(n_splits=config['experiment']['cv_splits'], shuffle=True, random_state=42)
     
+    neg_count = (y_train == 0).sum()
+    pos_count = (y_train == 1).sum()
+    spw = neg_count / max(pos_count, 1)
+    print(f"   ✓ Dynamic Class Balance Ratio: {spw:.2f}")
+
     for name, m_cfg in config['models'].items():
         print(f"    - Training {name}...")
-        full_pipeline = build_pipeline(m_cfg['model'], X_train)
+        if name == 'XGBoost':
+            m_cfg['model'].set_params(scale_pos_weight=spw)
+            
+        full_pipeline = build_pipeline(m_cfg['model'], X_train.columns.tolist())
         gs = GridSearchCV(full_pipeline, m_cfg['params'], cv=cv, scoring='f1', n_jobs=-1)
         gs.fit(X_train, y_train, groups=groups_train)
         
         best_pipe = gs.best_estimator_
-        best_t, val_f05 = find_best_threshold(best_pipe, X_val, y_val)
+        best_t, val_f1 = find_best_threshold(best_pipe, X_val, y_val)
         
         val_probs = best_pipe.predict_proba(X_val)[:, 1] if hasattr(best_pipe, "predict_proba") else None
         val_pred = (val_probs >= best_t) if val_probs is not None else best_pipe.predict(X_val)
         
         results[name] = {
-            'val_f05': val_f05,
-            'val_f1': f1_score(y_val, val_pred),
+            'val_f1': val_f1,
+            'val_f05': fbeta_score(y_val, val_pred, beta=0.5),
+            'val_acc': accuracy_score(y_val, val_pred),
             'val_prec': precision_score(y_val, val_pred, zero_division=0),
             'val_rec': recall_score(y_val, val_pred),
             'val_auc': roc_auc_score(y_val, val_probs) if val_probs is not None else None,
             'best_threshold': best_t,
             'model_pipeline': best_pipe
         }
-        print(f"      Val F0.5: {val_f05:.4f} (Threshold={best_t:.2f})")
+        print(f"      Val F1: {val_f1:.4f} (Threshold={best_t:.2f})")
         
     return results
 
 def save_winner(results, config):
-    winner_name = max(results, key=lambda x: results[x]['val_f05'])
+    winner_name = max(results, key=lambda x: results[x]['val_f1'])
     winner_data = results[winner_name]
     
     model_path = os.path.join(config['paths']['model_dir'], 'winner_model.joblib')
@@ -239,22 +248,28 @@ def save_winner(results, config):
 
 if __name__ == "__main__":
     X_train, X_val, y_train, y_val, groups_train = prepare_data(CONFIG)
-    results = run_tuning(X_train, X_val, y_train, y_val, groups_train, CONFIG)
+    
+    top_features = select_best_features(X_train, y_train, CONFIG)
+    X_train_sel = X_train[top_features]
+    X_val_sel = X_val[top_features]
+    
+    results = run_tuning(X_train_sel, X_val_sel, y_train, y_val, groups_train, CONFIG)
     winner = save_winner(results, CONFIG)
     
     summary = []
     for name, res in results.items():
         summary.append({
             'Model': name,
-            'Val_F05': res['val_f05'],
             'Val_F1': res['val_f1'],
+            'Val_F05': res['val_f05'],
+            'Val_Acc': res['val_acc'],
             'Val_Prec': res['val_prec'],
             'Val_Rec': res['val_rec'],
             'Val_AUC': res['val_auc'],
             'Threshold': res['best_threshold']
         })
-    pd.DataFrame(summary).sort_values('Val_F05', ascending=False).to_csv(CONFIG['paths']['results_csv'], index=False)
+    pd.DataFrame(summary).sort_values('Val_F1', ascending=False).to_csv(CONFIG['paths']['results_csv'], index=False)
     print("\n" + "=" * 80)
-    print("VALIDATION SUMMARY (LEAKAGE-FREE)")
+    print("VALIDATION SUMMARY (LEAKAGE-FREE & SELECTIVE)")
     print("=" * 80)
-    print(pd.DataFrame(summary).sort_values('Val_F05', ascending=False).to_string(index=False))
+    print(pd.DataFrame(summary).sort_values('Val_F1', ascending=False).to_string(index=False))

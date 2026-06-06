@@ -99,7 +99,7 @@ if y_probs_test is not None:
 # LEVEL 3: Deep Dive (Error Surgery)
 # ==============================================================================
 print("\n" + "="*80)
-print("LEVEL 3: DEEP DIVE (Error Surgery - FP/FN Analysis)")
+print("DEEP DIVE (Error Surgery - FP/FN Analysis)")
 print("="*80)
 
 cm = confusion_matrix(y_test, y_pred_test)
@@ -141,7 +141,7 @@ fig.suptitle(f'Final Diagnostic Dashboard: {model_name} (Knowledge-Enriched & Pr
 
 # 1. Confusion Matrix Heatmap
 sns.heatmap(cm, annot=True, fmt='d', cmap='RdYlGn', ax=axes[0,0])
-axes[0,0].set_title('Level 3: Confusion Matrix')
+axes[0,0].set_title('Confusion Matrix')
 axes[0,0].set_ylabel('True')
 axes[0,0].set_xlabel('Predicted')
 
@@ -150,7 +150,7 @@ if y_probs_test is not None:
     fpr, tpr, _ = roc_curve(y_test, y_probs_test)
     axes[0,1].plot(fpr, tpr, label=f'ROC-AUC = {auc(fpr, tpr):.3f}')
     axes[0,1].plot([0, 1], [0, 1], 'k--')
-    axes[0,1].set_title('Level 1: ROC Curve')
+    axes[0,1].set_title('ROC Curve')
     axes[0,1].legend()
 
 # 3. Feature Importance (Top 15)
@@ -163,12 +163,12 @@ except:
 
 if hasattr(winner_model, 'feature_importances_'):
     imp = pd.DataFrame({'feature': final_feature_names, 'importance': winner_model.feature_importances_}).sort_values('importance', ascending=False)
-    sns.barplot(x='importance', y='feature', data=imp.head(15), ax=axes[1,0])
-    axes[1,0].set_title('Level 5: Top 15 Features')
+    sns.barplot(x='importance', y='feature', data=imp.head(10), ax=axes[1,0])
+    axes[1,0].set_title('Top 10 Features')
 elif hasattr(winner_model, 'coef_'):
     imp = pd.DataFrame({'feature': final_feature_names, 'importance': np.abs(winner_model.coef_[0])}).sort_values('importance', ascending=False)
-    sns.barplot(x='importance', y='feature', data=imp.head(15), ax=axes[1,0])
-    axes[1,0].set_title('Level 5: Top 15 Coefficients')
+    sns.barplot(x='importance', y='feature', data=imp.head(10), ax=axes[1,0])
+    axes[1,0].set_title('Top 15 Coefficients')
 
 # 4. Learning Curve (Overfit Diagnosis)
 print("   Computing Learning Curve (this might take a moment)...")
@@ -196,7 +196,7 @@ try:
     axes[1,1].plot(train_sizes, test_mean, 'o-', color='g', label='Cross-validation Score')
     axes[1,1].fill_between(train_sizes, train_mean - train_std, train_mean + train_std, alpha=0.1, color='r')
     axes[1,1].fill_between(train_sizes, test_mean - test_std, test_mean + test_std, alpha=0.1, color='g')
-    axes[1,1].set_title('Level 2: Learning Curve (F1-score)')
+    axes[1,1].set_title('Learning Curve (F1-score)')
     axes[1,1].set_xlabel('Training Examples')
     axes[1,1].set_ylabel('Score')
     axes[1,1].legend(loc="best")
