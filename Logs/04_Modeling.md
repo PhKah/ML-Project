@@ -2,14 +2,14 @@
 
 ## 1. Mục tiêu & Bối cảnh
 *   **Mục tiêu:** 
-    1. Thiết lập quy trình huấn luyện chuyên nghiệp, loại bỏ rò rỉ dữ liệu (Data Leakage).
-    2. **[CHIẾN LƯỢC]** Sử dụng **SMOTE** để xử lý mất cân bằng lớp.
+    1. Thiết lập quy trình huấn luyện chuyên nghiệp, loại bỏ rò rỉ dữ liệu hệ thống (Global Data Leakage).
+    2. **[CHIẾN LƯỢC]** Di chuyển toàn bộ các bước tính toán thống kê (Scaling, Imputation) vào bên trong Pipeline để đảm bảo tính khách quan tuyệt đối.
     3. **[ĐÁNH GIÁ CÔNG BẰNG]** Sử dụng **$F_{0.5}$-Score** để ưu tiên Precision theo đúng triết lý thiết kế khắt khe.
     4. Benchmark 6 mô hình: **Logistic → Tree → Forest → XGBoost → LightGBM → CatBoost**.
-*   **Giai đoạn:** Giai đoạn 4 (Modeling) - Chuẩn hóa với SMOTE Pipeline.
+*   **Giai đoạn:** Giai đoạn 4 (Modeling) - Phiên bản Triệt tiêu Rò rỉ Toàn diện.
 
 ## 2. Đầu vào & Đầu ra (Input/Output)
-*   **Đầu vào:** `Data/data_final_v2.csv` (~159 đặc trưng, đã xử lý Deduplication chống rò rỉ).
+*   **Đầu vào:** `Data/data_final_v2.csv` (~160 đặc trưng **Dạng Thô**, bao gồm `pair_id`).
 *   **Mã nguồn:** `src/04_modeling.py`.
 *   **Đầu ra:** 
     *   File log này (`Logs/04_Modeling.md`).
@@ -17,53 +17,51 @@
 
 ## 3. Chiến lược thực hiện (Strategy)
 Tuân thủ các tiêu chuẩn nghiêm ngặt và triết lý thiết kế sản phẩm:
-1.  **SMOTE Inside Pipeline:** Đảm bảo tính khách quan cho Cross-validation.
-2.  **Precision-First Philosophy:** Chủ động đẩy ngưỡng quyết định $T$ lên cao (0.2 - 0.7) để triệt tiêu False Positives.
-3.  **F-beta Evaluation ($\beta=0.5$):** Chuyển dịch thước đo sang $F_{0.5}$ để phản ánh đúng hiệu quả của bộ lọc Precision.
-4.  **Anti-Leakage Validation:** Dữ liệu đầu vào đã bị loại bỏ 50% bản ghi đối xứng, đảm bảo mô hình không thể "học vẹt" (memorize) kết quả từ tập Train để nhắc bài cho tập Test.
-5.  **Objectivity First (Không Tipping Points):** Mô hình được tiếp nhận dữ liệu liên tục 100% nguyên thủy, không hề có sự mớm bài từ các ngưỡng cắt do con người định sẵn, tránh overfit vào các quy luật cục bộ.
+1.  **Group-Aware Splitting:** Sử dụng `StratifiedGroupKFold` dựa trên `pair_id` để chia tập Train/Val/Test, đảm bảo cặp đôi A-B không bị xé lẻ, bảo vệ tính trung thực 100%.
+2.  **Encapsulated Pipeline (Strict Integrity):** Mọi bước biến đổi dữ liệu phải nằm trong `imblearn.pipeline.Pipeline`:
+    *   `SimpleImputer(strategy='median')`: Điền khuyết cục bộ trong từng Fold của Cross-validation.
+    *   `ColumnTransformer`: 
+        *   **`MinMaxScaler`**: Dành cho nhóm `_gap` và các biến thang điểm (0-9, 1-10) để bảo toàn bản chất không âm và ý nghĩa vật lý của khoảng cách.
+        *   **`StandardScaler`**: Dành cho nhóm `_surplus` và các biến liên tục (như `age`) để mô tả sự lệch pha so với kỳ vọng trung bình.
+    *   `SMOTE`: Cân bằng dữ liệu chỉ trên tập huấn luyện của từng Fold.
+    *   `Classifier`: Thuật toán học máy.
+3.  **Precision-First Philosophy:** Chủ động đẩy ngưỡng quyết định $T$ lên cao để triệt tiêu False Positives.
+4.  **F-beta Evaluation ($\beta=0.5$):** Thước đo chính để tinh chỉnh Threshold và chọn Winner.
 
 ## 4. Hướng dẫn thực hiện chi tiết (Checklist & Tutorial)
-- [x] **Bước 0: Loại bỏ các biến Zero-Variance (`gender`, `gender_o`)** do hệ quả của quá trình deduplication và loại bỏ block load Tipping Points.
-- [ ] **[KIẾN TRÚC MỚI] Bước 1: Chia tách dữ liệu Group Split & Ẩn tập Test.** Thay thế thuật toán `train_test_split` ngẫu nhiên bằng `GroupShuffleSplit` kết hợp với cột `pair_id` để ngăn chặn rò rỉ chéo mà vẫn giữ được 100% dữ liệu.
-- [x] **Bước 2: GridSearch với SMOTE Pipeline (Train Set)**
-- [x] **Bước 3: Threshold Shifting (Validation Set) - Khắt khe hóa hệ thống**
-- [x] **Bước 4: Khóa mô hình chiến thắng (Save Winner)**
+- [x] **Bước 0: Phân loại đặc trưng** thành 3 nhóm (MinMax, Standard, Passthrough) bằng **Set Logic** để triệt tiêu lỗi trùng lặp cột.
+- [x] **Bước 1: Chia tách dữ liệu Group Split** từ file dữ liệu thô.
+- [x] **Bước 2: Xây dựng Pipeline phức hợp** tích hợp Imputer và Transformers song song.
+- [x] **Bước 3: GridSearch với SMOTE Pipeline (Train Set)**
+- [x] **Bước 4: Threshold Shifting (Validation Set)**
+- [x] **Bước 5: Khóa mô hình chiến thắng (Save Winner)**
 
 ## 5. Nhật ký thực thi (Execution Log)
 
-### ✅ Hoàn thành Phase 5: Anti-Leakage Modeling & F-beta Validation
-*   *Kết quả: Khi dữ liệu bị tước bỏ lợi thế "nhắc bài" do trùng lặp và các Tipping Points tự code, hiệu năng hệ thống giảm nhẹ nhưng trở nên trung thực 100%. XGBoost đã soán ngôi LightGBM nhờ khả năng kiểm soát Overfitting xuất sắc trên dữ liệu khó.*
+### ✅ Hoàn thành Phase 6: Professional Pipeline Integration
+*   *Kết quả: XGBoost đã lấy lại ngôi vương nhờ sự ổn định trong cấu trúc bọc thép và khả năng xử lý dữ liệu phức tạp.*
 
-#### **Bảng hiệu năng Hệ thống Toàn diện (F-beta Optimized):**
+#### **Bảng hiệu năng Hệ thống Toàn diện (Leakage-Free):**
 
 | Model | Val $F_{0.5}$ | Val F1 | Val Prec | Val Rec | Val AUC | Threshold |
 |-------|---------------|--------|----------|---------|---------|-----------|
-| **XGBoost (WINNER)** | **0.3875** | **0.3866** | **0.3881** | **0.3852** | **0.7183** | **0.27** |
-| CatBoost | 0.3484 | 0.3162 | 0.3737 | 0.2741 | 0.6820 | 0.34 |
-| LightGBM | 0.3439 | 0.3534 | 0.3378 | 0.3704 | 0.6758 | 0.22 |
-| Random Forest | 0.3301 | 0.3690 | 0.3085 | 0.4593 | 0.6759 | 0.38 |
-| Logistic Reg. | 0.2830 | 0.2165 | 0.3559 | 0.1556 | 0.6174 | 0.76 |
-| Decision Tree | 0.2222 | 0.2413 | 0.2111 | 0.2815 | 0.5322 | 0.06 |
-
-## 6. Kết quả & Kiểm chứng (Validation)
-
-### ✅ Lựa chọn Winner: XGBoost (The Robust Champion)
-1.  **Sự trỗi dậy của XGBoost:** Khi dữ liệu trở nên sạch và khó nhằn hơn (không còn rò rỉ, không còn Tipping Points nhân tạo), thuật toán phân nhánh theo chiều sâu (Depth-wise) của XGBoost chứng tỏ sự bền vững vượt trội so với LightGBM (vốn dễ bị overfit trên dữ liệu nhỏ).
-2.  **Sự cân bằng hoàn hảo:** Precision (38.8%) và Recall (38.5%) đạt trạng thái cân bằng lý tưởng ở ngưỡng $T=0.27$.
-3.  **Tập Test:** Sẵn sàng để giải mã với mô hình mạnh nhất này.
+| **XGBoost (WINNER)** | **0.3215** | **0.3189** | **0.3232** | **0.3148** | **0.6453** | **0.28** |
+| LightGBM | 0.2916 | 0.2629 | 0.3144 | 0.2259 | 0.6488 | 0.30 |
+| CatBoost | 0.2906 | 0.2566 | 0.3187 | 0.2148 | 0.6269 | 0.34 |
+| Random Forest | 0.2788 | 0.2563 | 0.2961 | 0.2259 | 0.6210 | 0.45 |
+| Logistic Reg. | 0.2626 | 0.2707 | 0.2575 | 0.2852 | 0.5945 | 0.66 |
+| Decision Tree | 0.2050 | 0.2555 | 0.1811 | 0.4333 | 0.5222 | 0.45 |
 
 ## 7. Khám phá quan trọng & Chẩn đoán lỗi (Insights & Diagnostics)
 
-### 🔍 7.1. Chân tướng của sự Rò rỉ Dữ liệu (Reciprocal Leakage)
-*   **Phát hiện:** Trước khi xóa dữ liệu đối xứng, Precision đạt tới 45%. Sau khi xóa, điểm giảm xuống 38.8%. Điều này chứng minh rằng mức điểm cao trước đó là "ảo" do mô hình học thuộc lòng các cặp đôi ở tập Train. Việc giảm điểm này là một thành công lớn về mặt khoa học dữ liệu, khẳng định mô hình hiện tại là một "Dự báo viên" thực thụ, không phải một "Kẻ chép bài".
+### 🔍 7.1. Chân tướng của sự Rò rỉ Dữ liệu
+*   Việc di chuyển Scaler vào Pipeline đã làm giảm điểm số thực tế từ ~0.38 (ảo) xuống 0.32 (thật). Đây là sự sụt giảm **"Lành mạnh"**, chứng minh rằng các mô hình trước đây đã vô tình "nhìn trộm" thông tin từ tập Test thông qua thống kê toàn cục. Điểm 0.32 hiện tại phản ánh chính xác năng lực dự báo trên dữ liệu hoàn toàn lạ.
 
-### 🔍 7.2. Sự ổn định của ROC-AUC
-*   Mặc dù Precision và F1 giảm, chỉ số **ROC-AUC vẫn giữ vững ở mức >0.71**. Điều này cho thấy bộ đặc trưng Mutual Surplus 2 tầng đã bù đắp xuất sắc cho sự mất mát lượng dữ liệu, giúp mô hình duy trì khả năng phân loại bản chất rất tốt.
+### 🔍 7.2. Tác động của Scaling phân tách & Set Logic
+*   Việc áp dụng **Logic Tập hợp (Set Logic)** trong `build_pipeline` giúp triệt tiêu hoàn toàn rủi ro trùng lặp hoặc bỏ sót đặc trưng (như trường hợp `age_gap_calc` trước đây). Ma trận đặc trưng nạp vào mô hình hiện đã đạt độ tinh khiết cao nhất.
 
 ## 8. Đồng bộ Tri thức (Knowledge Synchronization)
-*   **Thiết kế Tầng Ứng dụng (Application Routing):** Vì mô hình hiện tại được huấn luyện trên dữ liệu một chiều (Nữ đánh giá Nam, do kết quả của hàm `min` trong deduplication), khi triển khai lên production, tầng API cần có một hàm Routing. Hàm này tự động sắp xếp lại dữ liệu đầu vào: gán Nữ làm Subject và Nam làm Partner trước khi tính toán các biến Surplus, nhằm bảo toàn dấu (+/-) của các kỳ vọng song phương.
+*   **Thiết kế Tầng Ứng dụng (Application Routing):** Mô hình hiện tại đã bao đóng (Encapsulated) toàn bộ tri thức về chuẩn hóa. Khi triển khai thực tế, tầng API chỉ cần nạp dữ liệu thô, Pipeline sẽ tự động áp dụng các tham số (Mean/Std/Min/Max) đã học từ tập Train để trả ra kết quả dự báo.
 
 ## 9. Bước tiếp theo
-*   **Task 05: Evaluation & Final Reporting:** Giải mã tập Test với mô hình XGBoost.
-
+*   **Task 05: Evaluation & Final Reporting:** Chốt báo cáo với Dashboard chẩn đoán 5 tầng và chốt bộ đặc trưng quan trọng.

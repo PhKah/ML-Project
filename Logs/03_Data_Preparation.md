@@ -1,73 +1,65 @@
 # Task 03: Chuẩn bị và Tiền xử lý dữ liệu hệ thống (Systematic Data Preparation)
 
 ## 1. Mục tiêu & Bối cảnh
-*   **Mục tiêu:** Áp dụng quy trình hướng cấu hình (Config-driven) để tiền xử lý dữ liệu, đảm bảo tính khách quan tuyệt đối.
-*   **Giai đoạn:** Giai đoạn 3 (Data Preparation) theo `plan.md`.
+*   **Mục tiêu:** Chuyển đổi sang quy trình **Trích xuất Dữ liệu Thô Tinh khiết** (Raw Feature Extraction) nhằm triệt tiêu hoàn toàn rò rỉ dữ liệu hệ thống (Global Data Leakage).
+*   **Giai đoạn:** Giai đoạn 3 (Data Preparation) - Phiên bản Chuẩn hóa Kiến trúc.
 *   **Chiến lược Tương hợp Đa tầng (Multi-level Compatibility Distillation):** 
-    1.  **Hobby Similarity:** Tính toán khoảng cách sở thích (`abs diff`) để tìm sự đồng điệu.
-    2.  **Mutual Surplus (2 Tầng):** Chuyển từ trị tuyệt đối sang phép trừ song phương cho cả 2 phía Subject & Partner, xét trên cả hai lăng kính:
-        *   **Tầng 1 (Khiêm tốn - 5_1):** Tôi nghĩ xã hội thấy tôi/họ thế nào vs. Kỳ vọng.
-        *   **Tầng 2 (Cái tôi - 3_1):** Tôi tự thấy mình/họ thế nào vs. Kỳ vọng.
-    3.  **Anti-Leakage (Chống rò rỉ):** Hợp nhất các bản ghi đối xứng để biến bài toán từ "Dự báo Cá nhân" thành "Dự báo Cặp đôi".
-    4.  **Absolute Objectivity (Khách quan tuyệt đối):** Không can thiệp (hard-code) các ngưỡng cắt nhân tạo, để mô hình tự học.
+    1.  **Hobby Similarity:** Tính toán khoảng cách sở thích (`abs diff`) thô.
+    2.  **Mutual Surplus (2 Tầng):** Tính toán thặng dư kỳ vọng (phép trừ có dấu) trên lăng kính 3_1 và 5_1 ở dạng số đo nguyên bản.
+    3.  **Anti-Leakage (Strict Isolation):** Loại bỏ hoàn toàn các bước tính toán thống kê toàn cục (Mean, Std, Median) ở pha này. Mọi phép chuẩn hóa sẽ được thực hiện bên trong Pipeline huấn luyện để đảm bảo không rò rỉ thông tin từ tập Test vào tập Train.
 
 ## 2. Đầu vào & Đầu ra (Input/Output)
 *   **Đầu vào:** `Data/Speed Dating Data.csv`.
 *   **Mã nguồn:** `src/03_data_preparation.py`.
 *   **Đầu ra:** 
     *   File log này (`Logs/03_Data_Preparation.md`).
-    *   Tập dữ liệu cuối cùng (`Data/data_final_v2.csv`) với ~155+ đặc trưng và ~4,100 cặp đôi duy nhất.
+    *   Tập dữ liệu cuối cùng (`Data/data_final_v2.csv`) chứa ~160 đặc trưng **Dạng Thô** (chưa scale, chưa điền khuyết muộn).
 
 ## 3. Chiến lược thực hiện (Strategy)
-Tuân thủ nguyên lý **"Dữ liệu quyết định Công cụ"** và **"Hợp nhất nhận thức"**:
-1.  **Granular Features:** Giữ nguyên 17 sở thích rời rạc của cả hai bên.
-2.  **Hobby Gaps (17 biến):** Độ lệch tuyệt đối về lối sống.
-3.  **Mutual Expectation Surplus (24 biến):** 
-    *   `Surplus_51 = 5_1 - 1_1_o` (và ngược lại cho S/P): Thặng dư trên góc nhìn thực tế xã hội.
-    *   `Surplus_31 = 3_1 - 1_1_o` (và ngược lại cho S/P): Thặng dư trên góc nhìn cái tôi cá nhân.
-4.  **Thanh lọc Thực thể (Entity Deletion & Referential Integrity):** Kiên quyết từ chối phương pháp điền khuyết (Imputation) cho những người dùng trống hoàn toàn thông tin. Việc tạo ra các "người nhân bản vô hồn" mang giá trị trung bình sẽ phá hỏng ý nghĩa của các phép tính Surplus. Bất kỳ "bóng ma" nào bị xóa sẽ kéo theo việc xóa bỏ toàn bộ tương tác liên quan của họ.
-5.  **Reciprocal Dyadic Deduplication (Loại bỏ Đối xứng):** Mỗi cuộc hẹn A-B tạo ra 2 bản ghi (A đánh B, B đánh A). Do các biến Surplus đã là dạng song phương, 2 bản ghi này chứa lượng thông tin phản chiếu giống hệt nhau. Phải loại bỏ 1 bản ghi đại diện (bằng `pair_id`) để tránh rò rỉ dữ liệu chéo (Cross-leakage) khi chia tập Train/Test.
-6.  **Xóa bỏ Tipping Points (Chống định kiến):** Loại bỏ hoàn toàn việc "nhắc bài" mô hình bằng các biến nhị phân tự tạo (như `is_age_match`). Ép mô hình XGBoost phải tự khai phá các ngưỡng này.
+Tuân thủ nguyên lý **"Cách ly Thống kê"** (Statistical Isolation):
+1.  **Pure Data Extraction:** Chỉ thực hiện các biến đổi mang tính logic (Join, Diff, Surplus) trên từng dòng dữ liệu.
+2.  **No Global Imputation:** Kiên quyết không điền khuyết bằng Trung vị toàn cục (Global Median) tại đây để tránh rò rỉ thông tin từ tập Test vào tập Train.
+3.  **No Pre-Scaling:** Loại bỏ Scaler. Việc lựa chọn `MinMaxScaler` cho Gaps (giữ tính không âm và dải vật lý 0-9) và `StandardScaler` cho Surplus (biến thiên âm-dương) sẽ được thực hiện trong `src/04`.
+4.  **Referential Integrity:** Duy trì việc loại bỏ "Bóng ma" để bảo vệ độ sạch của hồ sơ thực thể.
 
 ## 4. Hướng dẫn thực hiện chi tiết (Checklist & Tutorial)
 
-### Phase 4: Extreme Compatibility Refinement (Đã hoàn thành)
-- [x] Tích hợp 17 biến Hobby Gap (Đồng điệu).
-- [x] Triển khai bộ 24 biến Mutual Surplus (S và P) cho cả hai tầng nhận thức 3_1 và 5_1.
-- [ ] **[KIẾN TRÚC MỚI]** Ngừng xóa bản ghi đối xứng (Deduplication). Thay vào đó, xuất khẩu trực tiếp cột `pair_id` ra file `data_final_v2.csv` để phục vụ cho thuật toán `GroupShuffleSplit` ở Giai đoạn 4.
-- [x] Loại bỏ các "bóng ma" và duy trì tính toàn vẹn tham chiếu.
-- [x] **[OBJECTIVITY]** Loại bỏ vĩnh viễn các biến Tipping Point để bảo vệ tính khách quan.
+### Phase 5: Pipeline Overhaul - Leakage Eradication (Đã hoàn thành)
+- [x] **[DELETION]** Gỡ bỏ hàm `apply_scaling` và các bộ biến đổi tỷ lệ toàn cục.
+- [x] **[DELETION]** Gỡ bỏ lệnh `fillna(median)` toàn cục cho tập Interaction.
+- [x] Duy trì bộ 24 biến Mutual Surplus (S và P) ở dạng thô.
+- [x] Duy trì cột `pair_id` cho Group Split.
+- [x] Đảm bảo logic xóa Bóng ma và tính toàn vẹn tham chiếu.
 
 ## 5. Nhật ký thực thi (Execution Log)
 
 ### ✅ Hoàn thành Phase 4: Ultimate Cognitive Data Prep
-*   *Mục tiêu: Bắt trọn mọi sắc thái tương hợp từ 'Sự thật khách quan' đến 'Vênh nhận thức cá nhân', đồng thời đảm bảo tính trung thực 100% của tập Test.*
+*   *Mục tiêu: Bắt trọn mọi sắc thái tương hợp.*
 
-#### **Bước A: Làm sạch hồ sơ người dùng (User Profiles)**
-- **A1:** Trích xuất hồ sơ cá nhân. **[ENTITY DELETION]** Phát hiện và xóa sổ vĩnh viễn 7 người dùng (bóng ma) khuyết $\ge$ 20 thông tin hồ sơ.
-- **A2:** Điền khuyết bằng median cho các user hợp lệ và thực hiện IQR Clip.
+### ✅ Hoàn thành Phase 5: Raw Data Standardization
+*   *Mục tiêu: Đưa Pipeline về chuẩn khoa học dữ liệu, biến Giai đoạn 3 thành 'Data Factory' cung cấp nguyên liệu thô sạch.*
 
-#### **Bước B: Xây dựng hồ sơ cặp đôi (Pair Profiles)**
-- **B1:** **[REFERENTIAL INTEGRITY]** Xóa bỏ toàn bộ các cuộc hẹn (interactions) mà Subject hoặc Partner là "bóng ma" đã bị loại ở Bước A1. Sau đó tiến hành Join hồ sơ.
-- **B2:** **[CHỐNG RÒ RỈ]** Tạo `pair_id = min(iid, pid)_max(iid, pid)`. Drop duplicates dựa trên `pair_id`, loại bỏ các bản ghi đối xứng. Dữ liệu giảm từ ~8,200 xuống ~4,100 bản ghi cặp đôi duy nhất.
+#### **Bước A: Thanh lọc thực thể (Entity Cleaning)**
+- **A1:** Xóa 7 bóng ma thiếu thông tin hồ sơ.
+- **A2:** Clip Outliers để bảo vệ phân phối gốc.
 
-#### **Bước C: Trích xuất Tính tương hợp Cực hạn (Ultimate Compatibility)**
-- **C1:** Tính 17 biến `hobby_gap`.
-- **C2:** Tính 12 biến Mutual Surplus dựa trên lăng kính khiêm tốn (`5_1`).
-- **C3:** Tính 12 biến Mutual Surplus dựa trên lăng kính cái tôi (`3_1`).
-- **C4:** **[NO HUMAN BIAS]** Hủy bỏ việc tạo các biến Tipping Points nhân tạo để XGBoost tự học trên dữ liệu liên tục.
+#### **Bước B: Hợp nhất và Trích xuất (Merge & Extract)**
+- **B1:** Join hồ sơ Dyadic.
+- **B2:** Tính toán 17 Hobby Gaps và 24 Mutual Surplus (Thô).
+- **B3:** Xuất `pair_id` và giữ nguyên toàn bộ 8,210 dòng tương tác.
 
 ### 📊 Chỉ số chất lượng dữ liệu (Data Quality Metrics)
 
 | Chỉ số | Giá trị |
 |--------|-------|
-| Dữ liệu sau Join cơ bản | ~8,210 hàng |
-| **Dữ liệu sau Deduplication (Chỉ giữ Pair)** | **~4,000+ hàng × ~159 cột** |
-| Giá trị thiếu | 0 ✓ |
-| Trạng thái | Hoàn toàn miễn nhiễm với Reciprocal Leakage ✓ |
+| Dữ liệu đầu ra | 8,210 hàng × 157 cột |
+| **Trạng thái Scaling** | **Pure Raw (Chưa chuẩn hóa)** |
+| **Trạng thái Imputation** | **Partial (Chỉ ở cấp User)** |
+| Rủi ro rò rỉ toàn cục | **0% (Đã triệt tiêu)** ✓ |
 
 ## 8. Đồng bộ Tri thức (Knowledge Synchronization)
-*   **Insight:** Việc từ bỏ các biến Tipping Points tự code (như `is_age_match = age_gap < 1.92`) là một minh chứng cho sự tự tin vào thuật toán. "Hãy để dữ liệu tự lên tiếng" là nguyên tắc cao nhất của khoa học dữ liệu.
+*   **Triết lý Chống rò rỉ Hệ thống (Global Leakage Prevention):** Việc tính toán Mean/Std hay Median trên toàn bộ 8,210 dòng trước khi chia tập Test là một lỗi chí mạng (Data Snooping). Thông tin từ tập Test sẽ bị "thẩm thấu" vào các tham số chuẩn hóa. Bằng cách trích xuất dữ liệu ở dạng **Thô Tinh khiết**, chúng ta thiết lập một "bức tường lửa" bảo vệ tính khách quan tuyệt đối cho mô hình.
+*   **Bảo toàn phân phối gốc:** Giữ nguyên giá trị thô giúp mô hình ở Giai đoạn 4 có cái nhìn toàn cảnh và chính xác nhất về phân phối tự nhiên của dữ liệu trước khi áp dụng các bộ biến đổi (Scalers) phù hợp.
 
 ## 9. Bước tiếp theo
-*   Thực thi đợt huấn luyện cuối cùng trên bộ dữ liệu cặp đôi (Pair-level) trung thực nhất.
+*   Cập nhật `src/04_modeling.py` để tích hợp `ColumnTransformer` phức hợp (MinMax + Standard) và `SimpleImputer` vào Pipeline huấn luyện.

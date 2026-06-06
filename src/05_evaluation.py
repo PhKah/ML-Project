@@ -40,7 +40,7 @@ print("\n[0] Loading Locked Winner Model and Hidden Test Set...")
 if not os.path.exists(CONFIG['paths']['winner_model']):
     raise FileNotFoundError(f"Winner model not found at {CONFIG['paths']['winner_model']}. Run Task 04 first.")
 
-# Load winner info
+# Load winner inf   o
 winner = joblib.load(CONFIG['paths']['winner_model'])
 model_name = winner['name']
 pipeline = winner['pipeline']
@@ -154,13 +154,19 @@ if y_probs_test is not None:
     axes[0,1].legend()
 
 # 3. Feature Importance (Top 15)
-inner_model = pipeline.named_steps['model']
-if hasattr(inner_model, 'feature_importances_'):
-    imp = pd.DataFrame({'feature': feature_names, 'importance': inner_model.feature_importances_}).sort_values('importance', ascending=False)
+winner_model = pipeline.named_steps['clf']
+# Robustly get feature names from the preprocessor
+try:
+    final_feature_names = pipeline.named_steps['preprocessor'].get_feature_names_out()
+except:
+    final_feature_names = feature_names
+
+if hasattr(winner_model, 'feature_importances_'):
+    imp = pd.DataFrame({'feature': final_feature_names, 'importance': winner_model.feature_importances_}).sort_values('importance', ascending=False)
     sns.barplot(x='importance', y='feature', data=imp.head(15), ax=axes[1,0])
     axes[1,0].set_title('Level 5: Top 15 Features')
-elif hasattr(inner_model, 'coef_'):
-    imp = pd.DataFrame({'feature': feature_names, 'importance': np.abs(inner_model.coef_[0])}).sort_values('importance', ascending=False)
+elif hasattr(winner_model, 'coef_'):
+    imp = pd.DataFrame({'feature': final_feature_names, 'importance': np.abs(winner_model.coef_[0])}).sort_values('importance', ascending=False)
     sns.barplot(x='importance', y='feature', data=imp.head(15), ax=axes[1,0])
     axes[1,0].set_title('Level 5: Top 15 Coefficients')
 
@@ -168,11 +174,8 @@ elif hasattr(inner_model, 'coef_'):
 print("   Computing Learning Curve (this might take a moment)...")
 try:
     df_all = pd.read_csv(CONFIG['paths']['input_data'])
-    cols_to_drop = ['iid', 'pid', 'match']
-    if 'pair_id' not in df_all.columns: cols_to_drop.remove('pair_id') # handle if not there
-    else: cols_to_drop.append('pair_id')
-    if 'gender' in df_all.columns: cols_to_drop.append('gender')
-    if 'gender_o' in df_all.columns: cols_to_drop.append('gender_o')
+    # EXACT columns as used in Task 04 training
+    cols_to_drop = ['iid', 'pid', 'match', 'pair_id']
     
     X_all = df_all.drop([c for c in cols_to_drop if c in df_all.columns], axis=1)
     y_all = df_all['match']
