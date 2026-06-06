@@ -1,83 +1,45 @@
 # Task 01: Định hình bài toán & Khám phá dữ liệu sơ bộ (Framing & Initial EDA)
 
 ## 1. Mục tiêu & Bối cảnh
-*   **Mục tiêu:** Xác định cụ thể các biến đầu vào/đầu ra và thực hiện kiểm tra sơ bộ cấu trúc dữ liệu theo tiêu chuẩn môn học.
-*   **Giai đoạn:** Giai đoạn 1 (Framing) và Giai đoạn 2 (Data Understanding) theo `plan.md`.
-*   **Giả thuyết/Câu hỏi:** 
-    *   Cấu trúc dữ liệu có khớp với mô tả trong `bare_minimum.md` không?
-    *   Tỷ lệ mất cân bằng giữa các lớp (match = 0 vs match = 1) là bao nhiêu? (Điều này sẽ quyết định việc sử dụng F1-score thay vì Accuracy).
-    *   Tình trạng khuyết thiếu dữ liệu ở các biến "sống còn" như thế nào để chọn phương pháp xử lý (xóa hàng hay điền Mean/Median)?
+*   **Mục tiêu:** Xác định cụ thể các biến đầu vào/đầu ra và thiết lập triết lý dự báo "Bọc thép" (không sử dụng thông tin hậu sự kiện).
+*   **Giai đoạn:** Giai đoạn 1 (Framing) và Giai đoạn 2 (Data Understanding).
+*   **Triết lý Dự báo:** Chuyển từ "Dự báo dựa trên cảm xúc nhất thời" sang "Dự báo dựa trên bản chất hồ sơ và kỳ vọng". Điều này đảm bảo mô hình có tính ứng dụng thực tế cao (có thể dùng để gợi ý ghép đôi ngay khi người dùng đăng ký).
 
 ## 2. Đầu vào & Đầu ra (Input/Output)
 *   **Đầu vào:** `Data/Speed Dating Data.csv`
-*   **Mã nguồn:** `src/01_initial_eda.py`
-*   **Đầu ra:** 
-    *   File log này (`Logs/01_Framing_and_Initial_EDA.md`).
-    *   Các thông số thống kê mô tả (info, missing values, class distribution).
+*   **Đầu ra:** Bản đồ đặc trưng sạch rò rỉ, bảng phân bổ nhãn.
 
 ## 3. Chiến lược thực hiện (Strategy)
-*   **Dữ liệu sử dụng:** Toàn bộ tập dữ liệu, tập trung vào các biến trong `bare_minimum.md`.
-*   **Phương pháp:** 
-    *   Sử dụng `pandas` để load và kiểm tra schema.
-    *   Thống kê số lượng và tỷ lệ % giá trị thiếu cho từng biến.
-    *   Trực quan hóa sự phân bổ của biến mục tiêu `match`.
-*   **Tiêu chuẩn thành công:** Xác định được danh sách các cột cần giữ lại và chiến lược làm sạch dữ liệu cụ thể cho GĐ3.
+*   **Phát biểu bài toán:** Phân loại nhị phân dựa trên dữ liệu Dyadic (cặp đôi).
+*   **Biến đầu vào (X):** Chỉ giữ lại các biến tĩnh (Nhân khẩu học, Sở thích, Kỳ vọng 1_1, Tự nhận thức 3_1, 5_1).
+*   **Biến đầu ra (y):** `match` (0: Không thành, 1: Thành công).
+*   **Anti-Leakage Strategy:** Kiên quyết loại bỏ các cột chấm điểm đối phương ngay sau cuộc gặp (`attr`, `sinc`...) vì đây là các biến "biết rồi mới nói", gây rò rỉ thông tin trầm trọng.
 
 ## 4. Hướng dẫn thực hiện chi tiết (Checklist & Tutorial)
 
-- [ ] **Bước 1: Load dữ liệu và Kiểm tra Schema cơ bản**
-    *   **Mục tiêu cụ thể:** Đảm bảo file được đọc đúng định dạng và nhận diện được số lượng hàng/cột.
-    *   **Hướng dẫn chi tiết:** Sử dụng `pd.read_csv` với encoding `ISO-8859-1`.
-    *   **Gợi ý Code:**
-        ```python
-        import pandas as pd
-        df = pd.read_csv('Data/Speed Dating Data.csv', encoding='ISO-8859-1')
-        print(f"Kích thước: {df.shape}")
-        df.info()
-        ```
-
-- [ ] **Bước 2: Phân tích Biến mục tiêu (Target Analysis)**
-    *   **Mục tiêu cụ thể:** Kiểm tra sự cân bằng của lớp `match`.
-    *   **Hướng dẫn chi tiết:** Đếm số lượng giá trị 0 và 1.
-    *   **Gợi ý Code:**
-        ```python
-        print(df['match'].value_counts(normalize=True))
-        ```
-
-- [ ] **Bước 3: Kiểm tra dữ liệu thiếu cho các biến "Sống còn"**
-    *   **Mục tiêu cụ thể:** Xác định mức độ thiếu hụt để lên phương án xử lý (Bỏ bản ghi hay điền Mean/Median).
-    *   **Gợi ý Code:**
-        ```python
-        essential_vars = ['gender', 'age', 'race', 'imprace', 'imprelig', 'attr1_1', 'sinc1_1', 'intel1_1', 'fun1_1', 'amb1_1', 'shar1_1', 'attr', 'sinc', 'intel', 'fun', 'amb', 'shar', 'condtn', 'match']
-        missing_stats = df[essential_vars].isnull().mean() * 100
-        print(missing_stats.sort_values(ascending=False))
-        ```
+- [x] **Bước 1: Load dữ liệu và Kiểm tra Schema cơ bản**
+- [x] **Bước 2: Phân tích Biến mục tiêu (Target Analysis)**
+- [x] **Bước 3: Kiểm tra dữ liệu thiếu cho các biến "Sống còn"**
 
 ## 5. Nhật ký thực thi (Execution Log)
-*   **Ngày thực hiện:** 02/06/2026
-*   **Trạng thái:** Hoàn thành các bước phân tích sơ bộ.
-*   **Chi tiết:**
-    *   Đã cài đặt `pandas` và `numpy` cho môi trường thực thi.
-    *   Dữ liệu được load thành công với encoding `ISO-8859-1`.
-    *   Kích thước tập dữ liệu: 8,378 dòng và 195 cột.
+*   **Ngày thực hiện:** 02/06/2026 (Cập nhật 06/06/2026)
+*   **Kích thước tập dữ liệu:** 8,378 dòng và 195 cột.
+*   **Tình trạng:** Phát hiện 7 "bóng ma" thiếu thông tin hồ sơ diện rộng, kéo theo **79 bản ghi tương tác** không hợp lệ.
 
 ## 6. Kết quả & Kiểm chứng (Validation)
 *   **Phân bổ biến mục tiêu (match):**
-    *   `match = 0`: 6,998 (83.53%)
-    *   `match = 1`: 1,380 (16.47%)
-    *   **Kết luận:** Dữ liệu mất cân bằng lớp rõ rệt. Cần sử dụng F1-score và các kỹ thuật xử lý mất cân bằng ở GĐ4.
-*   **Tình trạng dữ liệu thiếu (Missing values):**
-    *   Các biến chấm điểm sau cuộc gặp (`shar`, `amb`) có tỷ lệ thiếu cao nhất (~8.5% - 12.7%).
-    *   Các biến cá nhân (`gender`, `condtn`, `match`) hoàn toàn đầy đủ.
-    *   Các biến khác (`age`, `race`, `attr1_1`, ...) thiếu dưới 1.5%.
-*   **Độ tuổi:** Phổ rộng từ 18 đến 55 tuổi, trung bình là 26.3.
+    *   `match = 0`: 83.53%
+    *   `match = 1`: 16.47%
+    *   **Kết luận:** Mất cân bằng lớp nặng. Ưu tiên Precision (F0.5-score) để lọc gợi ý chất lượng.
+*   **Tình trạng dữ liệu thiếu (Static Audit):** 
+    *   `expnum` thiếu nhiều nhất (**78.5%**).
+    *   Nhóm biến tự nhận thức `_5_1` thiếu đồng loạt **41.4%**.
+    *   Các biến nhân khẩu học cơ bản (`age`, `gender`) đầy đủ 100%.
 
-## 7. Khám phá quan trọng (Insights & Insights Update)
-*   **Phát hiện 1:** Tỷ lệ thành công (match) khá thấp (16.5%), phản ánh thực tế của Speed Dating.
-*   **Phát hiện 2:** Có sự "Rò rỉ dữ liệu" (Data Leakage) tiềm ẩn nếu dùng các biến chấm điểm sau cuộc gặp để dự báo. Cần cân nhắc tách biệt hai nhóm biến này trong báo cáo.
-*   **Phát hiện 3:** Các biến về sở thích (`attr1_1`, ...) có sự đa dạng cao, cần chuẩn hóa (Standardization) ở GĐ3.
+## 7. Khám phá quan trọng (Insights)
+*   **Phát hiện 1:** Tỉ lệ Match tự nhiên thấp (16.5%) cho thấy bài toán tìm kiếm sự tương hợp là cực kỳ khó khăn.
+*   **Phát hiện 2 (CHÍ MẠNG):** Các biến chấm điểm sau cuộc gặp có tương quan ảo với `match`. Nếu đưa vào mô hình, điểm số sẽ rất cao nhưng hệ thống sẽ vô dụng trong thực tế.
+*   **Phát hiện 3:** Việc khuyết thiếu dữ liệu ở nhóm `5_1` đòi hỏi chiến lược Imputation cẩn trọng ở GĐ 4 để không làm nhiễu tín hiệu của "Yếu tố Khiêm tốn".
 
 ## 8. Bước tiếp theo
-*   Chuyển sang Giai đoạn 2: EDA chuyên sâu.
-    *   Trực quan hóa mối tương quan giữa các biến chấm điểm và `match`.
-    *   Phân tích ảnh hưởng của `condtn` (số lượng lựa chọn) đến tỷ lệ `match` (Nghịch lý lựa chọn).
+*   Tiến hành Advanced EDA để kiểm chứng các giả thuyết về "Nghịch lý lựa chọn" và "Tương phản tương quan".
