@@ -137,8 +137,7 @@ def build_pipeline(classifier, X):
     ] or (c.endswith('_o') and any(sub in c for sub in ['sports', 'dining', 'art', 'museums']))} - standard_cols
     minmax_cols = (gap_cols | score_cols) & all_cols
     
-    # 3. Định nghĩa nhóm Categories (Nominal features cần One-Hot Encoding)
-    # Bao gồm các biến định danh gốc và các biến đối tác (_o)
+    # 3. Định nghĩa nhóm Categories (Nominal features)
     cat_base = {'gender', 'race', 'goal', 'career_c', 'condtn', 'samerace'}
     cat_cols = {c for c in all_cols if any(b == c or f"{b}_o" == c for b in cat_base)} & all_cols
     
@@ -156,10 +155,15 @@ def build_pipeline(classifier, X):
         ('scaler', StandardScaler())
     ])
     
-    cat_pipe = Pipeline([
-        ('imputer', SimpleImputer(strategy='most_frequent')),
-        ('ohe', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
-    ])
+    # [NEW LOGIC] One-Hot Encoding chỉ dành cho Logistic Regression
+    if isinstance(classifier, LogisticRegression):
+        cat_pipe = Pipeline([
+            ('imputer', SimpleImputer(strategy='most_frequent')),
+            ('ohe', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
+        ])
+    else:
+        # Đối với các mô hình cây (XGB, CatBoost, v.v.), giữ nguyên nhãn số (Passthrough sau khi điền khuyết)
+        cat_pipe = SimpleImputer(strategy='most_frequent')
     
     passthrough_pipe = SimpleImputer(strategy='median')
 

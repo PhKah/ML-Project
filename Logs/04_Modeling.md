@@ -36,6 +36,8 @@ Tuân thủ các tiêu chuẩn nghiêm ngặt và triết lý thiết kế sản
 - [x] **Bước 3: GridSearch với SMOTE Pipeline (Train Set)**
 - [x] **Bước 4: Threshold Shifting (Validation Set)**
 - [x] **Bước 5: Khóa mô hình chiến thắng (Save Winner)**
+- [ ] **Bước 6: Mở rộng Benchmark** với các thuật toán mới (AdaBoost, SVM) để tìm kiếm giới hạn hiệu năng.
+- [ ] **Bước 7: Kiểm chứng Giả thuyết (Hypothesis Verification)** thông qua Feature Importance và Counterfactual Analysis.
 
 ## 5. Nhật ký thực thi (Execution Log)
 
