@@ -23,6 +23,7 @@ Tuân thủ các tiêu chuẩn nghiêm ngặt và triết lý thiết kế sản
     *   `ColumnTransformer`: 
         *   **`MinMaxScaler`**: Dành cho nhóm `_gap` và các biến thang điểm (0-9, 1-10) để bảo toàn bản chất không âm và ý nghĩa vật lý của khoảng cách.
         *   **`StandardScaler`**: Dành cho nhóm `_surplus` và các biến liên tục (như `age`) để mô tả sự lệch pha so với kỳ vọng trung bình.
+        *   **`OneHotEncoder`**: Dành cho các biến định danh (race, goal, career_c) để triệt tiêu quan hệ thứ tự giả định từ các mã số gốc.
     *   `SMOTE`: Cân bằng dữ liệu chỉ trên tập huấn luyện của từng Fold.
     *   `Classifier`: Thuật toán học máy.
 3.  **Precision-First Philosophy:** Chủ động đẩy ngưỡng quyết định $T$ lên cao để triệt tiêu False Positives.
@@ -38,19 +39,19 @@ Tuân thủ các tiêu chuẩn nghiêm ngặt và triết lý thiết kế sản
 
 ## 5. Nhật ký thực thi (Execution Log)
 
-### ✅ Hoàn thành Phase 6: Professional Pipeline Integration
-*   *Kết quả: XGBoost đã lấy lại ngôi vương nhờ sự ổn định trong cấu trúc bọc thép và khả năng xử lý dữ liệu phức tạp.*
+### ✅ Hoàn thành Phase 7: OHE Integration & Model Re-benchmarking
+*   *Kết quả: Sau khi tích hợp One-Hot Encoding, CatBoost đã vươn lên vị trí dẫn đầu, vượt qua XGBoost với hiệu năng ổn định hơn trên các biến định danh.*
 
-#### **Bảng hiệu năng Hệ thống Toàn diện (Leakage-Free):**
+#### **Bảng hiệu năng Hệ thống Toàn diện (Leakage-Free - With OHE):**
 
 | Model | Val $F_{0.5}$ | Val F1 | Val Prec | Val Rec | Val AUC | Threshold |
 |-------|---------------|--------|----------|---------|---------|-----------|
-| **XGBoost (WINNER)** | **0.3215** | **0.3189** | **0.3232** | **0.3148** | **0.6453** | **0.28** |
-| LightGBM | 0.2916 | 0.2629 | 0.3144 | 0.2259 | 0.6488 | 0.30 |
-| CatBoost | 0.2906 | 0.2566 | 0.3187 | 0.2148 | 0.6269 | 0.34 |
-| Random Forest | 0.2788 | 0.2563 | 0.2961 | 0.2259 | 0.6210 | 0.45 |
-| Logistic Reg. | 0.2626 | 0.2707 | 0.2575 | 0.2852 | 0.5945 | 0.66 |
-| Decision Tree | 0.2050 | 0.2555 | 0.1811 | 0.4333 | 0.5222 | 0.45 |
+| **CatBoost (WINNER)** | **0.3227** | **0.3168** | **0.3268** | **0.3074** | **0.6437** | **0.31** |
+| LightGBM | 0.2913 | 0.3243 | 0.2727 | 0.4000 | 0.6449 | 0.20 |
+| Random Forest | 0.2864 | 0.2756 | 0.2941 | 0.2593 | 0.6244 | 0.42 |
+| XGBoost | 0.2852 | 0.2394 | 0.3269 | 0.1889 | 0.6251 | 0.34 |
+| Logistic Reg. | 0.2735 | 0.2791 | 0.2699 | 0.2889 | 0.6202 | 0.66 |
+| Decision Tree | 0.2201 | 0.2870 | 0.1905 | 0.5815 | 0.5523 | 0.35 |
 
 ## 7. Khám phá quan trọng & Chẩn đoán lỗi (Insights & Diagnostics)
 

@@ -10,7 +10,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, roc_auc_score, fbeta_score
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler,OneHotEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
 from imblearn.over_sampling import SMOTE
@@ -137,8 +137,13 @@ def build_pipeline(classifier, X):
     ] or (c.endswith('_o') and any(sub in c for sub in ['sports', 'dining', 'art', 'museums']))} - standard_cols
     minmax_cols = (gap_cols | score_cols) & all_cols
     
-    # 3. Nhóm còn lại (Passthrough - giữ nguyên mã hóa hạng mục nhưng vẫn điền khuyết)
-    remaining_cols = all_cols - standard_cols - minmax_cols
+    # 3. Định nghĩa nhóm Categories (Nominal features cần One-Hot Encoding)
+    # Bao gồm các biến định danh gốc và các biến đối tác (_o)
+    cat_base = {'gender', 'race', 'goal', 'career_c', 'condtn', 'samerace'}
+    cat_cols = {c for c in all_cols if any(b == c or f"{b}_o" == c for b in cat_base)} & all_cols
+    
+    # 4. Nhóm còn lại (Passthrough - giữ nguyên nhưng vẫn điền khuyết)
+    remaining_cols = all_cols - standard_cols - minmax_cols - cat_cols
     
     # Xây dựng các Sub-pipelines
     minmax_pipe = Pipeline([
@@ -151,12 +156,18 @@ def build_pipeline(classifier, X):
         ('scaler', StandardScaler())
     ])
     
+    cat_pipe = Pipeline([
+        ('imputer', SimpleImputer(strategy='most_frequent')),
+        ('ohe', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
+    ])
+    
     passthrough_pipe = SimpleImputer(strategy='median')
 
-    # ColumnTransformer đảm bảo mỗi cột chỉ xuất hiện 1 lần nhờ logic set ở trên
+    # ColumnTransformer đảm bảo mỗi cột chỉ xuất hiện 1 lần
     transformer = ColumnTransformer([
         ('minmax', minmax_pipe, list(minmax_cols)),
         ('standard', standard_pipe, list(standard_cols)),
+        ('cat', cat_pipe, list(cat_cols)),
         ('pass_imp', passthrough_pipe, list(remaining_cols))
     ])
     
