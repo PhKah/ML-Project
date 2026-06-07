@@ -153,22 +153,38 @@ if y_probs_test is not None:
     axes[0,1].set_title('ROC Curve')
     axes[0,1].legend()
 
-# 3. Feature Importance (Top 15)
+# 3. Feature Importance (Top 10) - Enhanced with Clean Original Names
 winner_model = pipeline.named_steps['clf']
-# Robustly get feature names from the preprocessor
+preprocessor = pipeline.named_steps['preprocessor']
+
 try:
-    final_feature_names = pipeline.named_steps['preprocessor'].get_feature_names_out()
-except:
-    final_feature_names = feature_names
+    # Pass original input names to the transformer to get meaningful output names
+    raw_names = preprocessor.get_feature_names_out(feature_names)
+    
+    # Clean prefixes like 'std__', 'minmax__', 'cat__pass_cat__', 'cat__ohe__'
+    # We take the part after the last '__'
+    clean_feature_names = [n.split('__')[-1] for n in raw_names]
+except Exception as e:
+    print(f"   ⚠️ Warning: Could not extract feature names automatically: {e}")
+    # Fallback to feature_names if lengths match, else generic
+    if hasattr(winner_model, 'feature_importances_') and len(feature_names) == len(winner_model.feature_importances_):
+        clean_feature_names = feature_names
+    else:
+        clean_feature_names = [f"f{i}" for i in range(len(winner_model.feature_importances_))]
 
 if hasattr(winner_model, 'feature_importances_'):
-    imp = pd.DataFrame({'feature': final_feature_names, 'importance': winner_model.feature_importances_}).sort_values('importance', ascending=False)
-    sns.barplot(x='importance', y='feature', data=imp.head(10), ax=axes[1,0])
-    axes[1,0].set_title('Top 10 Features')
+    imp = pd.DataFrame({'feature': clean_feature_names, 'importance': winner_model.feature_importances_})
+    imp = imp.sort_values('importance', ascending=False).head(10)
+    sns.barplot(x='importance', y='feature', data=imp, ax=axes[1,0], palette='magma')
+    axes[1,0].set_title('Top 10 Features (Original Names)', fontsize=13, fontweight='bold')
+    axes[1,0].set_ylabel('')
 elif hasattr(winner_model, 'coef_'):
-    imp = pd.DataFrame({'feature': final_feature_names, 'importance': np.abs(winner_model.coef_[0])}).sort_values('importance', ascending=False)
-    sns.barplot(x='importance', y='feature', data=imp.head(10), ax=axes[1,0])
-    axes[1,0].set_title('Top 15 Coefficients')
+    # For Logistic Regression
+    imp = pd.DataFrame({'feature': clean_feature_names, 'importance': np.abs(winner_model.coef_[0])})
+    imp = imp.sort_values('importance', ascending=False).head(10)
+    sns.barplot(x='importance', y='feature', data=imp, ax=axes[1,0], palette='viridis')
+    axes[1,0].set_title('Top 10 Coefficients', fontsize=13, fontweight='bold')
+    axes[1,0].set_ylabel('')
 
 # 4. Learning Curve (Overfit Diagnosis)
 print("   Computing Learning Curve (this might take a moment)...")

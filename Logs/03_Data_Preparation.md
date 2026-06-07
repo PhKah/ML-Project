@@ -5,22 +5,23 @@
 *   **Giai đoạn:** Giai đoạn 3 (Data Preparation) - Phiên bản Chuẩn hóa Kiến trúc.
 *   **Chiến lược Tương hợp Đa tầng (Multi-level Compatibility Distillation):** 
     1.  **Hobby Similarity:** Tính toán khoảng cách sở thích (`abs diff`) thô.
-    2.  **Mutual Surplus (2 Tầng):** Tính toán thặng dư kỳ vọng (phép trừ có dấu) trên lăng kính 3_1 và 5_1 ở dạng số đo nguyên bản.
-    3.  **Anti-Leakage (Strict Isolation):** Loại bỏ hoàn toàn các bước tính toán thống kê toàn cục (Mean, Std, Median) ở pha này. Mọi phép chuẩn hóa sẽ được thực hiện bên trong Pipeline huấn luyện để đảm bảo không rò rỉ thông tin từ tập Test vào tập Train.
+    2.  **Feature Consolidation (Noise Reduction):** [MỚI] Gộp 17 đặc trưng sở thích nhỏ lẻ thành 1 chỉ số tổng hòa (`total_hobby_gap`) nhằm tránh hiện tượng Overfitting do cây quyết định phân nhánh quá vụn vặt.
+    3.  **Mutual Surplus (2 Tầng):** Tính toán thặng dư kỳ vọng (phép trừ có dấu) trên lăng kính 3_1 và 5_1 ở dạng số đo nguyên bản.
+    4.  **Anti-Leakage (Strict Isolation):** Loại bỏ hoàn toàn các bước tính toán thống kê toàn cục (Mean, Std, Median) ở pha này.
 
 ## 2. Đầu vào & Đầu ra (Input/Output)
 *   **Đầu vào:** `Data/Speed Dating Data.csv`.
 *   **Mã nguồn:** `src/03_data_preparation.py`.
 *   **Đầu ra:** 
     *   File log này (`Logs/03_Data_Preparation.md`).
-    *   Tập dữ liệu cuối cùng (`Data/data_final_v2.csv`) chứa ~160 đặc trưng **Dạng Thô** (chưa scale, chưa điền khuyết muộn).
+    *   Tập dữ liệu cuối cùng (`Data/data_final_v2.csv`) chứa ~160 đặc trưng **Dạng Thô**.
 
 ## 3. Chiến lược thực hiện (Strategy)
-Tuân thủ nguyên lý **"Cách ly Thống kê"** (Statistical Isolation):
+Tuân thủ nguyên lý **"Cách ly Thống kê"** (Statistical Isolation) và **"Cô đọng Tín hiệu"** (Signal Condensation):
 1.  **Pure Data Extraction:** Chỉ thực hiện các biến đổi mang tính logic (Join, Diff, Surplus) trên từng dòng dữ liệu.
-2.  **No Global Imputation:** Kiên quyết không điền khuyết bằng Trung vị toàn cục (Global Median) tại đây để tránh rò rỉ thông tin từ tập Test vào tập Train.
-3.  **No Pre-Scaling:** Loại bỏ Scaler. Việc lựa chọn `MinMaxScaler` cho Gaps (giữ tính không âm và dải vật lý 0-9) và `StandardScaler` cho Surplus (biến thiên âm-dương) sẽ được thực hiện trong `src/04`.
-4.  **Referential Integrity:** Duy trì việc loại bỏ "Bóng ma" để bảo vệ độ sạch của hồ sơ thực thể.
+2.  **Aggregation over Granularity:** Ưu tiên sử dụng các chỉ số tổng hợp cho những đặc trưng có độ biến thiên cao và giá trị lẻ (như sở thích cá nhân) để mô hình tập trung vào "Vibe" tổng thể thay vì các tiểu tiết gây nhiễu.
+3.  **No Global Imputation:** Kiên quyết không điền khuyết bằng Trung vị toàn cục tại đây.
+4.  **No Pre-Scaling:** Việc lựa chọn chuẩn hóa sẽ được thực hiện trong Pipeline của `src/04`.
 
 ## 4. Hướng dẫn thực hiện chi tiết (Checklist & Tutorial)
 
@@ -29,37 +30,23 @@ Tuân thủ nguyên lý **"Cách ly Thống kê"** (Statistical Isolation):
 - [x] **[DELETION]** Gỡ bỏ lệnh `fillna(median)` toàn cục cho tập Interaction.
 - [x] Duy trì bộ 24 biến Mutual Surplus (S và P) ở dạng thô.
 - [x] Duy trì cột `pair_id` cho Group Split.
+
+### Phase 6: Signal Condensation - Overfitting Prevention (Đang thực hiện)
+- [ ] **[NEW]** Triển khai hàm gộp 17 biến `_gap` sở thích thành biến `total_hobby_gap` (tổng hoặc trung bình).
+- [ ] Loại bỏ các biến `gap` sở thích lẻ để làm "sạch" không gian đặc trưng.
 - [x] Đảm bảo logic xóa Bóng ma và tính toàn vẹn tham chiếu.
 
 ## 5. Nhật ký thực thi (Execution Log)
 
-### ✅ Hoàn thành Phase 4: Ultimate Cognitive Data Prep
-*   *Mục tiêu: Bắt trọn mọi sắc thái tương hợp.*
-
 ### ✅ Hoàn thành Phase 5: Raw Data Standardization
 *   *Mục tiêu: Đưa Pipeline về chuẩn khoa học dữ liệu, biến Giai đoạn 3 thành 'Data Factory' cung cấp nguyên liệu thô sạch.*
 
-#### **Bước A: Thanh lọc thực thể (Entity Cleaning)**
-- **A1:** Xóa 7 bóng ma thiếu thông tin hồ sơ.
-- **A2:** Clip Outliers để bảo vệ phân phối gốc.
-
-#### **Bước B: Hợp nhất và Trích xuất (Merge & Extract)**
-- **B1:** Join hồ sơ Dyadic.
-- **B2:** Tính toán 17 Hobby Gaps và 24 Mutual Surplus (Thô).
-- **B3:** Xuất `pair_id` và giữ nguyên toàn bộ 8,210 dòng tương tác.
-
-### 📊 Chỉ số chất lượng dữ liệu (Data Quality Metrics)
-
-| Chỉ số | Giá trị |
-|--------|-------|
-| Dữ liệu đầu ra | 8,210 hàng × 157 cột |
-| **Trạng thái Scaling** | **Pure Raw (Chưa chuẩn hóa)** |
-| **Trạng thái Imputation** | **Partial (Chỉ ở cấp User)** |
-| Rủi ro rò rỉ toàn cục | **0% (Đã triệt tiêu)** ✓ |
+### 🔄 Khởi động Phase 6: Feature Aggregation
+*   *Lý do:* Quan sát thấy 7/10 đặc trưng quan trọng nhất của mô hình là các biến Gap sở thích lẻ (concerts, yoga...), dẫn đến rủi ro Overfitting cực cao. Việc gộp nhóm sẽ giúp mô hình "thông minh" và "tổng quát" hơn.
 
 ## 8. Đồng bộ Tri thức (Knowledge Synchronization)
-*   **Triết lý Chống rò rỉ Hệ thống (Global Leakage Prevention):** Việc tính toán Mean/Std hay Median trên toàn bộ 8,210 dòng trước khi chia tập Test là một lỗi chí mạng (Data Snooping). Thông tin từ tập Test sẽ bị "thẩm thấu" vào các tham số chuẩn hóa. Bằng cách trích xuất dữ liệu ở dạng **Thô Tinh khiết**, chúng ta thiết lập một "bức tường lửa" bảo vệ tính khách quan tuyệt đối cho mô hình.
-*   **Bảo toàn phân phối gốc:** Giữ nguyên giá trị thô giúp mô hình ở Giai đoạn 4 có cái nhìn toàn cảnh và chính xác nhất về phân phối tự nhiên của dữ liệu trước khi áp dụng các bộ biến đổi (Scalers) phù hợp.
+*   **Triết lý Signal-to-Noise Ratio:** Trong dữ liệu hành vi, việc có quá nhiều biến yếu (Weak predictors) sẽ dìm chết các biến mạnh (Strong predictors). Việc gộp nhóm đặc trưng là một bước "phẫu thuật" cần thiết để tăng tỷ lệ Tín hiệu/Nhiễu, giúp mô hình đạt được Precision thực tế thay vì Accuracy ảo.
 
 ## 9. Bước tiếp theo
-*   Cập nhật `src/04_modeling.py` để tích hợp `ColumnTransformer` phức hợp (MinMax + Standard) và `SimpleImputer` vào Pipeline huấn luyện.
+*   Cập nhật `src/03_data_preparation.py` để thực hiện gộp nhóm sở thích.
+*   Chạy lại `src/04_modeling.py` để kiểm chứng hiệu năng trên bộ đặc trưng tinh hoa mới.

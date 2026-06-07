@@ -13,7 +13,8 @@ from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_sc
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
+from imblearn.over_sampling import SMOTENC, SMOTE
+from imblearn.pipeline import Pipeline
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 from catboost import CatBoostClassifier
@@ -21,7 +22,7 @@ from catboost import CatBoostClassifier
 warnings.filterwarnings('ignore')
 
 # ============================================================================
-# [ANTI-LEAKAGE] CONFIGURATION - PROFESSIONAL PIPELINE INTEGRATION
+# [ANTI-LEAKAGE] CONFIGURATION - ADVANCED HYBRID SMOTE-NC PIPELINE
 # ============================================================================
 CONFIG = {
     'paths': {
@@ -34,19 +35,19 @@ CONFIG = {
     'experiment': {
         'random_state': 42,
         'cv_splits': 5,
-        'top_n_features': 40
+        'sampling_strategy': 0.43 # Fixed Sweet Spot (~30% Match)
     },
     'models': {
         'Logistic Regression': {
-            'model': LogisticRegression(max_iter=1000, random_state=42, class_weight='balanced'),
+            'model': LogisticRegression(max_iter=1000, random_state=42),
             'params': {'clf__C': [0.1, 1, 10]}
         },
         'Decision Tree': {
-            'model': DecisionTreeClassifier(random_state=42, class_weight='balanced'),
+            'model': DecisionTreeClassifier(random_state=42),
             'params': {'clf__max_depth': [5, 10]}
         },
         'Random Forest': {
-            'model': RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, class_weight='balanced'),
+            'model': RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
             'params': {'clf__max_depth': [10, 20]}
         },
         'XGBoost': {
@@ -57,14 +58,14 @@ CONFIG = {
             }
         },
         'LightGBM': {
-            'model': LGBMClassifier(n_estimators=100, random_state=42, importance_type='gain', verbose=-1, class_weight='balanced'),
+            'model': LGBMClassifier(n_estimators=100, random_state=42, importance_type='gain', verbose=-1),
             'params': {
                 'clf__num_leaves': [31, 63],
                 'clf__learning_rate': [0.05, 0.1]
             }
         },
         'CatBoost': {
-            'model': CatBoostClassifier(n_estimators=100, random_state=42, verbose=0, auto_class_weights='Balanced'),
+            'model': CatBoostClassifier(n_estimators=100, random_state=42, verbose=0),
             'params': {
                 'clf__depth': [4, 6],
                 'clf__learning_rate': [0.05, 0.1]
@@ -77,7 +78,7 @@ if not os.path.exists(CONFIG['paths']['model_dir']):
     os.makedirs(CONFIG['paths']['model_dir'])
 
 print("=" * 80)
-print("TASK 04: [LEAKAGE-FREE] PROFESSIONAL MODELING PIPELINE")
+print("TASK 04: [LEAKAGE-FREE] ADVANCED HYBRID SMOTE-NC (F1 TARGET)")
 print("=" * 80)
 
 # ============================================================================
@@ -116,79 +117,73 @@ def prepare_data(config):
     print(f"   ✓ Train: {len(X_train)} | Val: {len(X_val)} | Test: {len(X_test)}")
     return X_train, X_val, y_train, y_val, groups_train
 
-def select_best_features(X_train, y_train, config):
-    print(f"\n[1b] Feature Selection (Top {config['experiment']['top_n_features']} by Importance)...")
-    X_tmp = X_train.fillna(X_train.median())
-    selector_clf = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, class_weight='balanced')
-    selector_clf.fit(X_tmp, y_train)
+def build_pipeline(classifier, X_cols, sampling_strategy):
+    all_cols = list(X_cols)
     
-    importances = pd.Series(selector_clf.feature_importances_, index=X_train.columns)
-    top_features = importances.sort_values(ascending=False).head(config['experiment']['top_n_features']).index.tolist()
+    # 1. Identify Categorical Indices in raw input (for SMOTE-NC)
+    cat_base = {'gender', 'race', 'goal', 'career_c', 'condtn', 'samerace'}
+    cat_cols = sorted([c for c in all_cols if any(b == c or f"{b}_o" == c for b in cat_base)])
+    cat_indices = [all_cols.index(c) for c in cat_cols]
     
-    print(f"   ✓ Selected {len(top_features)} features.")
-    return top_features
-
-def build_pipeline(classifier, X_cols):
-    all_cols = set(X_cols)
+    # 2. Define Indices Groups for final transformation
+    # Standard: Age related and Surplus related (centered)
+    standard_cols = ['age', 'age_o', 'age_gap_calc']
+    standard_indices = sorted(list(set(
+        [all_cols.index(c) for c in all_cols if '_surplus' in c] + 
+        [all_cols.index(c) for c in standard_cols if c in all_cols]
+    )))
     
-    surplus_cols = {c for c in all_cols if '_surplus' in c}
-    cont_cols = {'age', 'age_o', 'age_gap_calc'}
-    standard_cols = (surplus_cols | cont_cols) & all_cols
-    
-    gap_cols = {c for c in all_cols if '_gap' in c} - standard_cols
-    score_cols = {c for c in all_cols if c in [
+    # MinMax: Hobby gaps and other score-based features (0-10 or 0-1)
+    gap_cols = [all_cols.index(c) for c in all_cols if '_gap' in c and all_cols.index(c) not in standard_indices]
+    score_cols = [all_cols.index(c) for c in all_cols if c in [
         'sports', 'tvsports', 'exercise', 'dining', 'museums', 'art', 
         'hiking', 'gaming', 'clubbing', 'reading', 'tv', 'theater', 
         'movies', 'concerts', 'music', 'shopping', 'yoga',
-        'exphappy', 'expnum', 'int_corr', 'imprace', 'imprelig'
-    ] or (c.endswith('_o') and any(sub in c for sub in ['sports', 'dining', 'art', 'museums']))} - standard_cols
-    minmax_cols = (gap_cols | score_cols) & all_cols
+        'exphappy', 'expnum', 'int_corr', 'imprace', 'imprelig', 'mean_hobby_gap'
+    ] or (c.endswith('_o') and any(sub in c for sub in ['sports', 'dining', 'art', 'museums']))]
+    minmax_indices = sorted(list(set(gap_cols + score_cols)))
     
-    cat_base = {'gender', 'race', 'goal', 'career_c', 'condtn', 'samerace'}
-    cat_cols = {c for c in all_cols if any(b == c or f"{b}_o" == c for b in cat_base)} & all_cols
-    
-    remaining_cols = all_cols - standard_cols - minmax_cols - cat_cols
-    
-    minmax_pipe = Pipeline([
-        ('imputer', SimpleImputer(strategy='median')),
-        ('scaler', MinMaxScaler())
-    ])
-    
-    standard_pipe = Pipeline([
-        ('imputer', SimpleImputer(strategy='median')),
-        ('scaler', StandardScaler())
-    ])
-    
+    remaining_indices = sorted([i for i in range(len(all_cols)) if i not in standard_indices + minmax_indices + cat_indices])
+
     if isinstance(classifier, LogisticRegression):
-        cat_pipe = Pipeline([
-            ('imputer', SimpleImputer(strategy='most_frequent')),
-            ('ohe', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
-        ])
+        cat_step = ('ohe', OneHotEncoder(handle_unknown='ignore', sparse_output=False), cat_indices)
+        resampler = SMOTE(sampling_strategy=sampling_strategy, random_state=42)
     else:
-        cat_pipe = SimpleImputer(strategy='most_frequent')
-    
-    passthrough_pipe = SimpleImputer(strategy='median')
+        cat_step = ('pass_cat', 'passthrough', cat_indices)
+        resampler = SMOTENC(categorical_features=cat_indices, sampling_strategy=sampling_strategy, random_state=42)
 
     transformer = ColumnTransformer([
-        ('minmax', minmax_pipe, list(minmax_cols)),
-        ('standard', standard_pipe, list(standard_cols)),
-        ('cat', cat_pipe, list(cat_cols)),
-        ('pass_imp', passthrough_pipe, list(remaining_cols))
+        ('std', StandardScaler(), standard_indices),
+        ('minmax', MinMaxScaler(), minmax_indices),
+        cat_step,
+        ('pass_imp', 'passthrough', remaining_indices)
     ])
     
     return Pipeline([
+        ('imputer', SimpleImputer(strategy='median')), 
+        ('smote', resampler),
         ('preprocessor', transformer),
         ('clf', classifier)
     ])
 
+def run_noise_audit(pipeline, X_train, name):
+    if name == 'Logistic Regression': return
+    X_proc = pipeline.named_steps['preprocessor'].transform(X_train.fillna(X_train.median()))
+    pre = pipeline.named_steps['preprocessor']
+    cat_data = X_proc[:, len(pre.transformers_[0][2]) + len(pre.transformers_[1][2]) : 
+                         len(pre.transformers_[0][2]) + len(pre.transformers_[1][2]) + len(pre.transformers_[2][2])]
+    noise_count = np.sum(cat_data % 1 != 0)
+    if noise_count == 0:
+        print(f"      ✓ Noise Audit: CLEAN (0 fractional values in category space)")
+    else:
+        print(f"      ⚠️ Noise Audit: WARNING ({noise_count} fractional values detected!)")
+
 def find_best_threshold(pipeline, X_val, y_val):
     if not hasattr(pipeline, "predict_proba"):
         return 0.5, f1_score(y_val, pipeline.predict(X_val))
-    
     y_probs = pipeline.predict_proba(X_val)[:, 1]
     thresholds = np.linspace(0.01, 0.99, 99)
     scores = [f1_score(y_val, y_probs >= t, zero_division=0) for t in thresholds]
-    
     best_idx = np.argmax(scores)
     return thresholds[best_idx], scores[best_idx]
 
@@ -197,35 +192,26 @@ def run_tuning(X_train, X_val, y_train, y_val, groups_train, config):
     results = {}
     cv = StratifiedGroupKFold(n_splits=config['experiment']['cv_splits'], shuffle=True, random_state=42)
     
-    neg_count = (y_train == 0).sum()
-    pos_count = (y_train == 1).sum()
-    spw = neg_count / max(pos_count, 1)
-    print(f"   ✓ Dynamic Class Balance Ratio: {spw:.2f}")
-
     for name, m_cfg in config['models'].items():
-        print(f"    - Training {name}...")
-        if name == 'XGBoost':
-            m_cfg['model'].set_params(scale_pos_weight=spw)
-            
-        full_pipeline = build_pipeline(m_cfg['model'], X_train.columns.tolist())
+        print(f"    - Tuning {name} with fixed ratio SMOTE-NC...")
+        full_pipeline = build_pipeline(m_cfg['model'], X_train.columns.tolist(), config['experiment']['sampling_strategy'])
         gs = GridSearchCV(full_pipeline, m_cfg['params'], cv=cv, scoring='f1', n_jobs=-1)
         gs.fit(X_train, y_train, groups=groups_train)
         
         best_pipe = gs.best_estimator_
+        run_noise_audit(best_pipe, X_train, name)
         best_t, val_f1 = find_best_threshold(best_pipe, X_val, y_val)
         
         val_probs = best_pipe.predict_proba(X_val)[:, 1] if hasattr(best_pipe, "predict_proba") else None
         val_pred = (val_probs >= best_t) if val_probs is not None else best_pipe.predict(X_val)
         
         results[name] = {
-            'val_f1': val_f1,
-            'val_f05': fbeta_score(y_val, val_pred, beta=0.5),
+            'val_f1': val_f1, 'val_f05': fbeta_score(y_val, val_pred, beta=0.5),
             'val_acc': accuracy_score(y_val, val_pred),
             'val_prec': precision_score(y_val, val_pred, zero_division=0),
             'val_rec': recall_score(y_val, val_pred),
             'val_auc': roc_auc_score(y_val, val_probs) if val_probs is not None else None,
-            'best_threshold': best_t,
-            'model_pipeline': best_pipe
+            'best_threshold': best_t, 'model_pipeline': best_pipe
         }
         print(f"      Val F1: {val_f1:.4f} (Threshold={best_t:.2f})")
         
@@ -234,42 +220,18 @@ def run_tuning(X_train, X_val, y_train, y_val, groups_train, config):
 def save_winner(results, config):
     winner_name = max(results, key=lambda x: results[x]['val_f1'])
     winner_data = results[winner_name]
-    
-    model_path = os.path.join(config['paths']['model_dir'], 'winner_model.joblib')
-    joblib.dump({
-        'name': winner_name,
-        'pipeline': winner_data['model_pipeline'],
-        'threshold': winner_data['best_threshold']
-    }, model_path)
-    
+    joblib.dump({'name': winner_name, 'pipeline': winner_data['model_pipeline'], 'threshold': winner_data['best_threshold']}, 
+                os.path.join(config['paths']['model_dir'], 'winner_model.joblib'))
     print(f"\n✓ WINNER LOCKED: {winner_name}")
-    print(f"✓ Pipeline saved to {model_path}")
     return winner_name
 
 if __name__ == "__main__":
     X_train, X_val, y_train, y_val, groups_train = prepare_data(CONFIG)
-    
-    top_features = select_best_features(X_train, y_train, CONFIG)
-    X_train_sel = X_train[top_features]
-    X_val_sel = X_val[top_features]
-    
-    results = run_tuning(X_train_sel, X_val_sel, y_train, y_val, groups_train, CONFIG)
+    results = run_tuning(X_train, X_val, y_train, y_val, groups_train, CONFIG)
     winner = save_winner(results, CONFIG)
-    
     summary = []
     for name, res in results.items():
-        summary.append({
-            'Model': name,
-            'Val_F1': res['val_f1'],
-            'Val_F05': res['val_f05'],
-            'Val_Acc': res['val_acc'],
-            'Val_Prec': res['val_prec'],
-            'Val_Rec': res['val_rec'],
-            'Val_AUC': res['val_auc'],
-            'Threshold': res['best_threshold']
-        })
+        summary.append({'Model': name, 'Val_F1': res['val_f1'], 'Val_F05': res['val_f05'], 'Val_Acc': res['val_acc'], 'Val_Prec': res['val_prec'], 'Val_Rec': res['val_rec'], 'Val_AUC': res['val_auc'], 'Threshold': res['best_threshold']})
     pd.DataFrame(summary).sort_values('Val_F1', ascending=False).to_csv(CONFIG['paths']['results_csv'], index=False)
-    print("\n" + "=" * 80)
-    print("VALIDATION SUMMARY (LEAKAGE-FREE & SELECTIVE)")
-    print("=" * 80)
+    print("\n" + "=" * 80 + "\nVALIDATION SUMMARY (LOCKED SMOTE-NC)\n" + "=" * 80)
     print(pd.DataFrame(summary).sort_values('Val_F1', ascending=False).to_string(index=False))

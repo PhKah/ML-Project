@@ -104,16 +104,26 @@ def calculate_ultimate_features(df):
     # C1: Age Gap
     df['age_gap_calc'] = (df['age'] - df['age_o']).abs()
     
-    # C2: Hobby Gaps (Similarity - absolute distance)
+    # C2: Hobby Gaps (Signal Condensation)
     hobbies = [
         'sports', 'tvsports', 'exercise', 'dining', 'museums', 'art', 
         'hiking', 'gaming', 'clubbing', 'reading', 'tv', 'theater', 
         'movies', 'concerts', 'music', 'shopping', 'yoga'
     ]
+    gap_cols = []
     for h in hobbies:
         if h in df.columns and f"{h}_o" in df.columns:
-            df[f'{h}_gap'] = (df[h] - df[f"{h}_o"]).abs()
-            
+            col_name = f'{h}_gap'
+            df[col_name] = (df[h] - df[f"{h}_o"]).abs()
+            gap_cols.append(col_name)
+    
+    # [NEW] Aggregate granular gaps into one holistic indicator to prevent over-splitting
+    df['mean_hobby_gap'] = df[gap_cols].mean(axis=1)
+    
+    # Keep only the important catalytic gap (shar_gap) and the aggregate, drop others
+    # Note: 'shar' is usually in the attrs list, but here we treat it as a general hobby indicator
+    df = df.drop(columns=gap_cols)
+    
     # C3: Mutual Expectation Surplus (2 Tiers - Phép trừ có dấu)
     attrs = ['attr', 'sinc', 'intel', 'fun', 'amb', 'shar']
     for a in attrs:
