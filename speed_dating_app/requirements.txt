@@ -1,0 +1,12 @@
+# Speed Dating Compatibility App
+# Cài đặt: pip install -r requirements.txt
+# Chạy:    python backend.py
+
+flask>=3.0
+scikit-learn==1.8.0
+catboost==1.2.10
+imbalanced-learn==0.14.1
+joblib==1.5.3
+pandas>=2.2
+numpy>=1.26
+scipy>=1.11
