@@ -78,7 +78,7 @@ if not os.path.exists(CONFIG['paths']['model_dir']):
     os.makedirs(CONFIG['paths']['model_dir'])
 
 print("=" * 80)
-print("TASK 04: [LEAKAGE-FREE] ADVANCED HYBRID SMOTE-NC (F1 TARGET)")
+print("TASK 04: [LEAKAGE-FREE] ADVANCED HYBRID SMOTE-NC (F0.5 TARGET)")
 print("=" * 80)
 
 # ============================================================================
@@ -126,14 +126,12 @@ def build_pipeline(classifier, X_cols, sampling_strategy):
     cat_indices = [all_cols.index(c) for c in cat_cols]
     
     # 2. Define Indices Groups for final transformation
-    # Standard: Age related and Surplus related (centered)
     standard_cols = ['age', 'age_o', 'age_gap_calc']
     standard_indices = sorted(list(set(
         [all_cols.index(c) for c in all_cols if '_surplus' in c] + 
         [all_cols.index(c) for c in standard_cols if c in all_cols]
     )))
     
-    # MinMax: Hobby gaps and other score-based features (0-10 or 0-1)
     gap_cols = [all_cols.index(c) for c in all_cols if '_gap' in c and all_cols.index(c) not in standard_indices]
     score_cols = [all_cols.index(c) for c in all_cols if c in [
         'sports', 'tvsports', 'exercise', 'dining', 'museums', 'art', 
@@ -145,12 +143,13 @@ def build_pipeline(classifier, X_cols, sampling_strategy):
     
     remaining_indices = sorted([i for i in range(len(all_cols)) if i not in standard_indices + minmax_indices + cat_indices])
 
+    # Always use SMOTENC
+    resampler = SMOTENC(categorical_features=cat_indices, sampling_strategy=sampling_strategy, random_state=42)
+
     if isinstance(classifier, LogisticRegression):
         cat_step = ('ohe', OneHotEncoder(handle_unknown='ignore', sparse_output=False), cat_indices)
-        resampler = SMOTE(sampling_strategy=sampling_strategy, random_state=42)
     else:
         cat_step = ('pass_cat', 'passthrough', cat_indices)
-        resampler = SMOTENC(categorical_features=cat_indices, sampling_strategy=sampling_strategy, random_state=42)
 
     transformer = ColumnTransformer([
         ('std', StandardScaler(), standard_indices),
@@ -180,45 +179,46 @@ def run_noise_audit(pipeline, X_train, name):
 
 def find_best_threshold(pipeline, X_val, y_val):
     if not hasattr(pipeline, "predict_proba"):
-        return 0.5, f1_score(y_val, pipeline.predict(X_val))
+        return 0.5, fbeta_score(y_val, pipeline.predict(X_val), beta=0.5)
     y_probs = pipeline.predict_proba(X_val)[:, 1]
     thresholds = np.linspace(0.01, 0.99, 99)
-    scores = [f1_score(y_val, y_probs >= t, zero_division=0) for t in thresholds]
+    scores = [fbeta_score(y_val, y_probs >= t, beta=0.5, zero_division=0) for t in thresholds]
     best_idx = np.argmax(scores)
     return thresholds[best_idx], scores[best_idx]
 
 def run_tuning(X_train, X_val, y_train, y_val, groups_train, config):
-    print(f"\n[2] Executing Leakage-Free GridSearchCV (Target: F1)...")
+    print(f"\n[2] Executing Leakage-Free GridSearchCV (Target: F0.5)...")
     results = {}
     cv = StratifiedGroupKFold(n_splits=config['experiment']['cv_splits'], shuffle=True, random_state=42)
+    f05_scorer = make_scorer(fbeta_score, beta=0.5)
     
     for name, m_cfg in config['models'].items():
         print(f"    - Tuning {name} with fixed ratio SMOTE-NC...")
         full_pipeline = build_pipeline(m_cfg['model'], X_train.columns.tolist(), config['experiment']['sampling_strategy'])
-        gs = GridSearchCV(full_pipeline, m_cfg['params'], cv=cv, scoring='f1', n_jobs=-1)
+        gs = GridSearchCV(full_pipeline, m_cfg['params'], cv=cv, scoring=f05_scorer, n_jobs=-1)
         gs.fit(X_train, y_train, groups=groups_train)
         
         best_pipe = gs.best_estimator_
         run_noise_audit(best_pipe, X_train, name)
-        best_t, val_f1 = find_best_threshold(best_pipe, X_val, y_val)
+        best_t, val_f05 = find_best_threshold(best_pipe, X_val, y_val)
         
         val_probs = best_pipe.predict_proba(X_val)[:, 1] if hasattr(best_pipe, "predict_proba") else None
         val_pred = (val_probs >= best_t) if val_probs is not None else best_pipe.predict(X_val)
         
         results[name] = {
-            'val_f1': val_f1, 'val_f05': fbeta_score(y_val, val_pred, beta=0.5),
+            'val_f05': val_f05, 'val_f1': f1_score(y_val, val_pred),
             'val_acc': accuracy_score(y_val, val_pred),
             'val_prec': precision_score(y_val, val_pred, zero_division=0),
             'val_rec': recall_score(y_val, val_pred),
             'val_auc': roc_auc_score(y_val, val_probs) if val_probs is not None else None,
             'best_threshold': best_t, 'model_pipeline': best_pipe
         }
-        print(f"      Val F1: {val_f1:.4f} (Threshold={best_t:.2f})")
+        print(f"      Val F0.5: {val_f05:.4f} (Threshold={best_t:.2f})")
         
     return results
 
 def save_winner(results, config):
-    winner_name = max(results, key=lambda x: results[x]['val_f1'])
+    winner_name = max(results, key=lambda x: results[x]['val_f05'])
     winner_data = results[winner_name]
     joblib.dump({'name': winner_name, 'pipeline': winner_data['model_pipeline'], 'threshold': winner_data['best_threshold']}, 
                 os.path.join(config['paths']['model_dir'], 'winner_model.joblib'))
@@ -231,7 +231,7 @@ if __name__ == "__main__":
     winner = save_winner(results, CONFIG)
     summary = []
     for name, res in results.items():
-        summary.append({'Model': name, 'Val_F1': res['val_f1'], 'Val_F05': res['val_f05'], 'Val_Acc': res['val_acc'], 'Val_Prec': res['val_prec'], 'Val_Rec': res['val_rec'], 'Val_AUC': res['val_auc'], 'Threshold': res['best_threshold']})
-    pd.DataFrame(summary).sort_values('Val_F1', ascending=False).to_csv(CONFIG['paths']['results_csv'], index=False)
+        summary.append({'Model': name, 'Val_F05': res['val_f05'], 'Val_Acc': res['val_acc'], 'Val_Prec': res['val_prec'], 'Val_Rec': res['val_rec'], 'Val_F1': res['val_f1'], 'Val_AUC': res['val_auc'], 'Threshold': res['best_threshold']})
+    pd.DataFrame(summary).sort_values('Val_F05', ascending=False).to_csv(CONFIG['paths']['results_csv'], index=False)
     print("\n" + "=" * 80 + "\nVALIDATION SUMMARY (LOCKED SMOTE-NC)\n" + "=" * 80)
-    print(pd.DataFrame(summary).sort_values('Val_F1', ascending=False).to_string(index=False))
+    print(pd.DataFrame(summary).sort_values('Val_F05', ascending=False).to_string(index=False))

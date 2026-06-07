@@ -153,7 +153,7 @@ if y_probs_test is not None:
     axes[0,1].set_title('ROC Curve')
     axes[0,1].legend()
 
-# 3. Feature Importance (Top 10) - Enhanced with Clean Original Names
+# 3. Feature Importance (Top 30) - Enhanced with Clean Original Names
 winner_model = pipeline.named_steps['clf']
 preprocessor = pipeline.named_steps['preprocessor']
 
@@ -174,9 +174,23 @@ except Exception as e:
 
 if hasattr(winner_model, 'feature_importances_'):
     imp = pd.DataFrame({'feature': clean_feature_names, 'importance': winner_model.feature_importances_})
-    imp = imp.sort_values('importance', ascending=False).head(10)
-    sns.barplot(x='importance', y='feature', data=imp, ax=axes[1,0], palette='magma')
-    axes[1,0].set_title('Top 10 Features (Original Names)', fontsize=13, fontweight='bold')
+    imp = imp.sort_values('importance', ascending=False).reset_index(drop=True)
+    imp['rank'] = imp.index + 1
+    
+    # Save full rankings for deep analysis
+    imp.to_csv('Data/feature_importance_full.csv', index=False)
+    print(f"   ✓ Full Feature Importance saved to Data/feature_importance_full.csv")
+    
+    # Diagnostic: Print rankings of Surplus features
+    surplus_imp = imp[imp['feature'].str.contains('surplus')]
+    print(f"\n🔍 SURPLUS FEATURES AUDIT (Rankings):")
+    if not surplus_imp.empty:
+        print(surplus_imp[['rank', 'feature', 'importance']].head(10).to_string(index=False))
+    else:
+        print("   ⚠️ No surplus features found in importance list!")
+
+    sns.barplot(x='importance', y='feature', data=imp.head(30), ax=axes[1,0], palette='magma')
+    axes[1,0].set_title('Top 30 Features (Original Names)', fontsize=13, fontweight='bold')
     axes[1,0].set_ylabel('')
 elif hasattr(winner_model, 'coef_'):
     # For Logistic Regression
