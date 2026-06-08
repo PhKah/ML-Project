@@ -6,7 +6,7 @@ import joblib
 import os
 from sklearn.metrics import (
     f1_score, precision_score, recall_score, accuracy_score, roc_auc_score,
-    confusion_matrix, classification_report, roc_curve, auc, fbeta_score, average_precision_score
+    confusion_matrix, classification_report, roc_curve, auc, fbeta_score, average_precision_score, make_scorer
 )
 from sklearn.model_selection import learning_curve, StratifiedGroupKFold
 import warnings
@@ -40,7 +40,7 @@ print("\n[0] Loading Locked Winner Model and Hidden Test Set...")
 if not os.path.exists(CONFIG['paths']['winner_model']):
     raise FileNotFoundError(f"Winner model not found at {CONFIG['paths']['winner_model']}. Run Task 04 first.")
 
-# Load winner inf   o
+# Load winner info
 winner = joblib.load(CONFIG['paths']['winner_model'])
 model_name = winner['name']
 pipeline = winner['pipeline']
@@ -160,9 +160,7 @@ preprocessor = pipeline.named_steps['preprocessor']
 try:
     # Pass original input names to the transformer to get meaningful output names
     raw_names = preprocessor.get_feature_names_out(feature_names)
-    
     # Clean prefixes like 'std__', 'minmax__', 'cat__pass_cat__', 'cat__ohe__'
-    # We take the part after the last '__'
     clean_feature_names = [n.split('__')[-1] for n in raw_names]
 except Exception as e:
     print(f"   ⚠️ Warning: Could not extract feature names automatically: {e}")
@@ -170,7 +168,7 @@ except Exception as e:
     if hasattr(winner_model, 'feature_importances_') and len(feature_names) == len(winner_model.feature_importances_):
         clean_feature_names = feature_names
     else:
-        clean_feature_names = [f"f{i}" for i in range(len(winner_model.feature_importances_))]
+        clean_feature_names = [f"f{i}" for i in range(len(winner_model.feature_importances_)) if hasattr(winner_model, 'feature_importances_')]
 
 if hasattr(winner_model, 'feature_importances_'):
     imp = pd.DataFrame({'feature': clean_feature_names, 'importance': winner_model.feature_importances_})
@@ -212,8 +210,10 @@ try:
     groups_all = df_all['pair_id'] if 'pair_id' in df_all.columns else None
     
     cv = StratifiedGroupKFold(n_splits=3, shuffle=True, random_state=42)
+    # Use F0.5 for learning curve to match modeling strategy
+    f05_scorer = make_scorer(fbeta_score, beta=0.5)
     train_sizes, train_scores, test_scores = learning_curve(
-        pipeline, X_all, y_all, groups=groups_all, cv=cv, scoring='f1', n_jobs=-1, 
+        pipeline, X_all, y_all, groups=groups_all, cv=cv, scoring=f05_scorer, n_jobs=-1, 
         train_sizes=np.linspace(0.1, 1.0, 5)
     )
     
@@ -226,7 +226,7 @@ try:
     axes[1,1].plot(train_sizes, test_mean, 'o-', color='g', label='Cross-validation Score')
     axes[1,1].fill_between(train_sizes, train_mean - train_std, train_mean + train_std, alpha=0.1, color='r')
     axes[1,1].fill_between(train_sizes, test_mean - test_std, test_mean + test_std, alpha=0.1, color='g')
-    axes[1,1].set_title('Learning Curve (F1-score)')
+    axes[1,1].set_title('Learning Curve (F0.5-score)')
     axes[1,1].set_xlabel('Training Examples')
     axes[1,1].set_ylabel('Score')
     axes[1,1].legend(loc="best")
